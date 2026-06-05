@@ -193,8 +193,11 @@ frappe.ui.form.on("Shaft Production Run", {
 
         if (BAG_MAKING_MACHINES.includes(frm.doc.custom_unit) && frm.doc.production_plan && frm.doc.docstatus === 0) {
             frappe.db.get_value("Production Plan", frm.doc.production_plan, "custom_packing", function(r) {
+                console.log("PACKING DEBUG: get_value response =", r);
+                console.log("PACKING DEBUG: custom_packing value =", r && r.message ? JSON.stringify(r.message) : "NO MESSAGE");
                 if (r && r.message && r.message.custom_packing) {
                     let packing_type = r.message.custom_packing;
+                    console.log("PACKING DEBUG: packing_type =", packing_type);
                     if (packing_type === 'Box Packing') {
                         frm.add_custom_button(__('Calculate Box'), function() {
                             show_bag_packing_dialog(frm, 'Box Packing');
@@ -203,7 +206,11 @@ frappe.ui.form.on("Shaft Production Run", {
                         frm.add_custom_button(__('Calculate Bora'), function() {
                             show_bag_packing_dialog(frm, 'Bora Packing');
                         });
+                    } else {
+                        console.log("PACKING DEBUG: packing_type did NOT match Box or Bora. Got:", JSON.stringify(packing_type));
                     }
+                } else {
+                    console.log("PACKING DEBUG: No custom_packing value found in Production Plan response.");
                 }
             });
         }
