@@ -149,7 +149,7 @@
                 return raw.includes("CUSTOM PRINTED BOPP BOX BAG") || raw.includes("COLORED BOPP BOX BAG") || raw.includes("COLORED BOPP SCREEN PRINTED BOX BAG") || hasItem;
             },
             visible_fields: [
-                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
+                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
             ]
         },
         {
@@ -164,7 +164,7 @@
                 return raw.includes("METALLIC BOPP BOX BAG") || raw.includes("METALLIC BOPP SHOPPER BAG") || hasItem;
             },
             visible_fields: [
-                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
+                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
             ]
         },
         {
@@ -179,7 +179,7 @@
                 return raw.includes("COOLER BOPP BOX BAG") || raw.includes("COOLER BOPP SHOPPER BAG") || hasItem;
             },
             visible_fields: [
-                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
+                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_bopp_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
             ]
         },
         {
@@ -194,7 +194,7 @@
                 return raw.includes("PRE-FLEXO LAMINATED PRINTED BOX BAG") || raw.includes("CUSTOM FLEXO LAMINATED PRINTED BOX BAG") || raw.includes("FLEXO LAMINATED PRINTED SHOPPER BAG") || hasItem;
             },
             visible_fields: [
-                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
+                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_fabric_gsm", "custom_lamination_gsm", "custom_lamination_side", "custom_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
             ]
         },
         {
@@ -209,7 +209,7 @@
                 return raw.includes("PRE-FLEXO PRINTED BOX BAG") || raw.includes("CUSTOM FLEXO PRINTED BOX BAG") || raw.includes("FLEXO PRINTED SHOPPER BAG") || hasItem;
             },
             visible_fields: [
-                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_gsm", "custom_fabric_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
+                "item_code", "item_name", "custom_process", "custom_design_code", "custom_design_name", "custom_no_of_design_colours", "custom_no_of_design_colour", "custom_design_colour", "custom_quality", "custom_colour", "custom_gsm", "custom_fabric_gsm", "custom_finishing", "custom_coating", "custom_bag_size", "custom_width_inch", "custom_width_mm", "custom_width_cm", "custom_height_inches", "custom_height_mm", "custom_height_cm", "custom_gazette_inch", "custom_gazette_mm", "custom_gazette_cm", "custom_top_folding_mm", "custom_sheet_width_mm", "custom_sheet_cut_length_mm", "custom_weight_per_bag_grams", "custom_loop_handle_quality", "custom_loop_handle_colour", "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_meter", "custom_meter_per_roll", "custom_no_of_rolls", "qty", "uom", "rate", "amount"
             ]
         },
         {
@@ -249,7 +249,7 @@
                 "custom_sheet_width_mm",
                 "custom_sheet_cut_length_mm",
                 "custom_weight_per_bag_grams",
-                "custom_loop_handle_type",
+                ,
                 "custom_loop_handle_quality",
                 "custom_loop_handle_colour",
                 "custom_loop_handle_gsm",
@@ -844,7 +844,7 @@
                 "custom_sheet_width_mm",
                 "custom_sheet_cut_length_mm",
                 "custom_weight_per_bag_grams",
-                "custom_loop_handle_type",
+                ,
                 "custom_loop_handle_quality",
                 "custom_loop_handle_colour",
                 "custom_loop_handle_gsm",
@@ -1299,22 +1299,22 @@
         plain_w_cut_bag: [
             "custom_design_colour", "custom_no_of_design_colour", "custom_no_of_design_colours",
             "custom_lamination_gsm", "custom_lamination_side", "custom_bopp_gsm",
-            "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour",
+            "custom_loop_handle_quality", "custom_loop_handle_colour",
             "custom_loop_handle_gsm", "custom_loop_handle_width_inches"
         ],
         printed_w_cut_bag: [
             "custom_lamination_gsm", "custom_lamination_side", "custom_bopp_gsm",
-            "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour",
+            "custom_loop_handle_quality", "custom_loop_handle_colour",
             "custom_loop_handle_gsm", "custom_loop_handle_width_inches"
         ],
         laminated_w_cut_bag: [
             "custom_design_colour", "custom_no_of_design_colour", "custom_no_of_design_colours",
             "custom_bopp_gsm",
-            "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour",
+            "custom_loop_handle_quality", "custom_loop_handle_colour",
             "custom_loop_handle_gsm", "custom_loop_handle_width_inches"
         ],
         laminated_printed_w_cut_bag: [
-            "custom_loop_handle_type", "custom_loop_handle_quality", "custom_loop_handle_colour",
+            "custom_loop_handle_quality", "custom_loop_handle_colour",
             "custom_loop_handle_gsm", "custom_loop_handle_width_inches"
         ],
         plain_box_bag: ["custom_design_colour", "custom_no_of_design_colour", "custom_no_of_design_colours", "custom_lamination_gsm", "custom_lamination_side", "custom_bopp_gsm"],
@@ -1353,7 +1353,7 @@
         }
 
         if (isWCut) {
-            deny.add("custom_loop_handle_type");
+            deny.add();
             deny.add("custom_loop_handle_quality");
             deny.add("custom_loop_handle_colour");
             deny.add("custom_loop_handle_gsm");

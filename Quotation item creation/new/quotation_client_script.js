@@ -3338,6 +3338,28 @@
                 fetchLhDesignFieldsFromMaster(frm, cdt, cdn, { includeColour: true, forceName: true });
             }
         },
+        custom_loop_handle_gsm: function (frm, cdt, cdn) {
+            const row = locals[cdt][cdn];
+            if (row && row.custom_lh_process === "NON WOVEN BOPP LAMINATED SLITTED FABRIC") {
+                let total = parseFloat(row.custom_loop_handle_gsm) || 0;
+                if (total > 0) {
+                    frappe.model.set_value(cdt, cdn, "custom_lh_lamination_gsm", "15");
+                    frappe.model.set_value(cdt, cdn, "custom_lh_bopp_gsm", "15");
+                    frappe.model.set_value(cdt, cdn, "custom_lh_fabric_gsm", String(total - 30));
+                }
+            }
+        },
+        custom_lh_fabric_gsm: function (frm, cdt, cdn) {
+            const row = locals[cdt][cdn];
+            if (row && row.custom_lh_process === "NON WOVEN BOPP LAMINATED SLITTED FABRIC") {
+                let fabric = parseFloat(row.custom_lh_fabric_gsm) || 0;
+                let lam = parseFloat(row.custom_lh_lamination_gsm) || 15;
+                let bopp = parseFloat(row.custom_lh_bopp_gsm) || 15;
+                if (fabric > 0) {
+                    frappe.model.set_value(cdt, cdn, "custom_loop_handle_gsm", String(fabric + lam + bopp));
+                }
+            }
+        },
         custom_design_code: function (frm, cdt, cdn) {
             const row = locals[cdt][cdn];
             if (row && row.custom_design_code) {
