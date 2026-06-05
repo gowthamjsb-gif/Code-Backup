@@ -1,0 +1,402 @@
+<style>
+    body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.2; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 4px; }
+    .border th, .border td { border: 1px solid #000; }
+    .header-box { border: 1px solid #000; padding: 10px; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .bold { font-weight: bold; }
+    .mt-10 { margin-top: 10px; }
+    .mt-20 { margin-top: 20px; }
+    .address-container { line-height: 1.3; }
+    .outside-label { font-size: 24px; font-weight: bold; text-align: center; width: 100%; margin-bottom: 10px; text-transform: uppercase; }
+    .keep-together { page-break-inside: avoid; }
+    tr { page-break-inside: auto; page-break-after: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    .company-logo { max-width: 280px; max-height: 120px; width: auto; height: auto; }
+</style>
+
+{% set billing_addr = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None %}
+{% if doc.shipping_address_name %}
+    {% set shipping_addr = frappe.get_doc("Address", doc.shipping_address_name) %}
+{% elif doc.shipping_address %}
+    {% set shipping_addr = frappe.get_doc("Address", doc.shipping_address) %}
+{% else %}
+    {% set shipping_addr = billing_addr %}
+{% endif %}
+
+<table width="100%" style="border: none;">
+    <thead>
+        <tr>
+            <td style="border: none; padding: 0;">
+                <div class="outside-label">{{ doc.doctype | upper }}</div>
+                <div class="header-box">
+                    <table width="100%" style="border: none;">
+                        <tr>
+                            <td width="60%" valign="top" style="border: none;">
+                                <div class="bold" style="font-size:18px; text-transform: uppercase;">JAYASHREE SPUN BOND</div>
+                                <div class="address-container" style="margin-top:6px;">
+                                   <b>Regd : </b> 42, Old Kuyavarpalayam Road , Madurai - 625009.<br>
+<b> Factory Address : </b> 3/4A, Nedungulam Main road,<br>
+Pottapalayam, Tamil Nadu India - 630611.<br>
+                                    <b>GSTIN :</b> 33AAIFJ4747P1ZT<br>
+                                                        <b>Email Id:</b> info@jayashreespunbond.com<br>
+                                    <b>Phone No:</b> +91 9789578884<br>
+                                    <b>State Name:</b> Tamil Nadu <b>Code:</b> 33<br>
+                                    
+                                </div>
+                            </td>
+                            <td width="40%" valign="top" class="text-right" style="border: none;">
+                                {% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") %}
+                                {% if company_logo %}<img src="{{ company_logo }}" class="company-logo"><br>{% endif %}
+                                <div style="line-height: 1.4; margin-top: 5px;">
+                                    <b>{{ doc.doctype }} No :</b> {{ doc.name }}<br>
+                                    <b>Date :</b> {{ doc.get_formatted("transaction_date") if doc.transaction_date else "" or doc.posting_date  }}<br>
+
+                                    {# Linked References Logic #}
+                                    {% set so_list = [] %}
+                                    {% set qt_list = [] %}
+                                    
+                                    {% for item in doc.items %}
+                                        {% if item.sales_order and item.sales_order not in so_list %}
+                                            {% set _ = so_list.append(item.sales_order) %}
+                                        {% endif %}
+                                        {% if item.get('quotation') and item.quotation not in qt_list %}
+                                            {% set _ = qt_list.append(item.quotation) %}
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if not qt_list and so_list %}
+                                        {% for so in so_list %}
+                                            {% set so_doc = frappe.get_doc("Sales Order", so) if frappe.db.exists("Sales Order", so) else None %}
+                                            {% if so_doc %}
+                                                {% for so_item in so_doc.items %}
+                                                    {% if so_item.get('quotation') and so_item.quotation not in qt_list %}
+                                                        {% set _ = qt_list.append(so_item.quotation) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+
+                                    {% if so_list %}
+                                        <b>Sales Order No :</b> {{ so_list | join(', ') }}<br>
+                                    {% endif %}
+                                    {% if qt_list %}
+                                        <b>Quotation No :</b> {{ qt_list | join(', ') }}<br>
+                                    {% endif %}
+
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <table class="border" width="100%" style="border-top: none;">
+    <tr>
+        <td width="50%" valign="top">
+            <div class="bold">BILL TO</div>
+            <div class="bold">{{ doc.customer_name }}</div>
+            <div class="address-container">
+                {% if billing_addr %}
+                    {{ billing_addr.address_line1 or "" }}<br>
+                    {% if billing_addr.address_line2 %}{{ billing_addr.address_line2 | replace('Roadsivakasi', 'Road, Sivakasi') | replace('roadsivakasi', 'road, sivakasi') }}<br>{% endif %}
+                    {{ billing_addr.city or "" }}{% if billing_addr.state %}, {{ billing_addr.state }}{% endif %} {% if billing_addr.country %}{{ billing_addr.country }}{% endif %} {{ billing_addr.pincode or "" }}<br>
+                    
+                    {%- set b_gstin = billing_addr.gstin or "" -%}
+                    <b>GST No:</b> {{ b_gstin }}<br>
+                    
+                    {%- set b_pan = billing_addr.pan or (b_gstin[2:12] if b_gstin|length >= 12 else "") -%}
+                    <b>PAN:</b> {{ b_pan }}<br>
+
+                    {# Merge Address Phone + Mobile + Document Contact Numbers #}
+                    {%- set final_b_phones = [] -%}
+                    {%- if billing_addr.phone and billing_addr.phone | trim not in final_b_phones -%}
+                        {%- set _ = final_b_phones.append(billing_addr.phone | trim) -%}
+                    {%- endif -%}
+                    {%- if billing_addr.mobile_no and billing_addr.mobile_no | trim not in final_b_phones -%}
+                        {%- set _ = final_b_phones.append(billing_addr.mobile_no | trim) -%}
+                    {%- endif -%}
+                    {%- if doc.contact_phone and doc.contact_phone | trim not in final_b_phones -%}
+                        {%- set _ = final_b_phones.append(doc.contact_phone | trim) -%}
+                    {%- endif -%}
+                    {%- if doc.contact_mobile and doc.contact_mobile | trim not in final_b_phones -%}
+                        {%- set _ = final_b_phones.append(doc.contact_mobile | trim) -%}
+                    {%- endif -%}
+                    <b>Phone No:</b> {{ final_b_phones | join(', ') }}<br>
+         
+                    {# Email Logic #}
+                    {%- set b_emails = [] -%}
+                    {%- if billing_addr.email_id -%}{%- set _ = b_emails.append(billing_addr.email_id | trim) -%}{%- endif -%}
+                    {%- if doc.contact_email and doc.contact_email not in b_emails -%}{%- set _ = b_emails.append(doc.contact_email | trim) -%}{%- endif -%}
+                    <b>Email Id:</b> {{ b_emails | join(', ') }}<br>
+                    
+                    {# FALLBACK LOGIC: Try GSTIN first, otherwise pull gst_state_number from Address #}
+                    {%- set b_state_code = (b_gstin[:2] if b_gstin|length >= 2 else billing_addr.gst_state_number) or "" -%}
+                    <b>State Name:</b> {{ billing_addr.state or "" }} <b>Code:</b> {{ b_state_code }}
+                {% endif %}
+            </div>
+        </td>
+         
+        <td width="50%" valign="top">
+            <div class="bold">SHIP TO</div>
+            <div class="bold">{{ doc.customer_name }}</div>
+            <div class="address-container">
+                {% if shipping_addr %}
+                    {{ shipping_addr.address_line1 or "" }}<br>
+                    {% if shipping_addr.address_line2 %}{{ shipping_addr.address_line2 | replace('Roadsivakasi', 'Road, Sivakasi') | replace('roadsivakasi', 'road, sivakasi') }}<br>{% endif %}
+                    {{ shipping_addr.city or "" }}{% if shipping_addr.state %}, {{ shipping_addr.state }}{% endif %} {% if shipping_addr.country %}{{ shipping_addr.country }}{% endif %} {{ shipping_addr.pincode or "" }}<br>
+                    
+                    {%- set s_gstin = shipping_addr.gstin or "" -%}
+                    <b>GST No:</b> {{ s_gstin }}<br>
+                    
+                    {%- set s_pan = shipping_addr.pan or (s_gstin[2:12] if s_gstin|length >= 12 else "") -%}
+                    <b>PAN:</b> {{ s_pan }}<br>
+
+                    {# Merge Address Phone + Mobile + Document Contact Numbers for Shipping #}
+                    {%- set final_s_phones = [] -%}
+                    {%- if shipping_addr.phone and shipping_addr.phone | trim not in final_s_phones -%}
+                        {%- set _ = final_s_phones.append(shipping_addr.phone | trim) -%}
+                    {%- endif -%}
+                    {%- if shipping_addr.mobile_no and shipping_addr.mobile_no | trim not in final_s_phones -%}
+                        {%- set _ = final_s_phones.append(shipping_addr.mobile_no | trim) -%}
+                    {%- endif -%}
+                    {%- if doc.contact_phone and doc.contact_phone | trim not in final_s_phones -%}
+                        {%- set _ = final_s_phones.append(doc.contact_phone | trim) -%}
+                    {%- endif -%}
+                    {%- if doc.contact_mobile and doc.contact_mobile | trim not in final_s_phones -%}
+                        {%- set _ = final_s_phones.append(doc.contact_mobile | trim) -%}
+                    {%- endif -%}
+                    <b>Phone No:</b> {{ final_s_phones | join(', ') }}<br>
+         
+                    {# Email Logic #}
+                    {%- set s_emails = [] -%}
+                    {%- if shipping_addr.email_id -%}{%- set _ = s_emails.append(shipping_addr.email_id | trim) -%}{%- endif -%}
+                    {%- if doc.contact_email and doc.contact_email not in s_emails -%}{%- set _ = s_emails.append(doc.contact_email | trim) -%}{%- endif -%}
+                    <b>Email Id:</b> {{ s_emails | join(', ') }}<br>
+         
+                    {# FALLBACK LOGIC: Try GSTIN first, otherwise pull gst_state_number from Address #}
+                    {%- set s_state_code = (s_gstin[:2] if s_gstin|length >= 2 else shipping_addr.gst_state_number) or "" -%}
+                    <b>State Name:</b> {{ shipping_addr.state or "" }} <b>Code:</b> {{ s_state_code }}
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+</table>
+
+
+                <div style="height: 10px;"></div>
+            </td>
+        </tr>
+    </thead>
+
+    <tbody>
+        <tr>
+            <td style="border: none; padding: 0;">
+                <table class="border mt-10 keep-together" width="100%">
+                    <tr>
+                        <td width="33%">
+                            <b>PAYMENT TERM</b><br><br> 
+                            {% if doc.payment_schedule %}
+                                {% for row in doc.payment_schedule %} {{ row.payment_term }}<br> {% endfor %}
+                            {% else %} {{ doc.payment_term or "" }} {% endif %}
+                        </td>
+                        <td width="33%">
+                            <b>DELIVERY TERM</b><br><br> {{ doc.custom_delivery_term or "" }}
+                        </td>
+                        <td width="34%">
+                            <b>DISPATCH THROUGH</b><br><br> {{ doc.custom_dispatch_through or "" }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><b>BOOKING WEEK</b><br><br> {{ doc.custom_other_references or "" }}</td>
+                        
+                        <td><b>DESTINATION</b><br><br>
+{{ doc.custom_destination or "" }}</td>
+<td><b>VEHICLE NO</b><br><br> {{ doc.vehicle_no or "" }}</td>
+</tr>
+                    <tr>
+                        <td>
+                           <b>DRIVER NAME</b><br><br> 
+{{ doc.driver_name or "" }}<br> 
+
+</td>
+                        <td><b>DRIVER PHONE NO</b><br><br> {{ doc.custom_driver_ph_no or "" }}
+</td>
+                        
+                        <td>
+            <b>POINT OF CONTACT</b><br><br>
+            {% if doc.contact_display %}
+                {{ doc.contact_display }}
+                {% if doc.contact_mobile %}
+                    <br>{{ doc.contact_mobile }}
+                {% elif doc.contact_phone %}
+                    <br>{{ doc.contact_phone }}
+                {% endif %}
+            {% else %}
+                None Listed
+            {% endif %}
+        </td>
+                    </tr>
+                </table>
+
+               {% set has_igst = doc.items | map(attribute='igst_amount') | sum > 0 %}
+
+<table class="border mt-20" width="100%">
+    <thead>
+        <tr class="bold text-center" style="background-color: #f2f2f2;">
+            <th width="3%">No</th>
+            <th width="22%">Item</th>
+            <th width="8%">HSN</th>
+            <th width="6%">Qty (Kgs)</th>
+            <th width="10%">Rate (₹)</th>
+            <th width="12%">Taxable Amt (₹)</th>
+            {% if has_igst %}
+                <th width="13%">IGST (₹)</th>
+            {% else %}
+                <th width="13%">CGST (₹)</th>
+                <th width="13%">SGST (₹)</th>
+            {% endif %}
+            <th width="13%">Total (₹)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+        {%- set row_total = item.amount + (item.cgst_amount or 0) + (item.sgst_amount or 0) + (item.igst_amount or 0) -%}
+        <tr>
+            <td class="text-center">{{ loop.index }}</td>
+            <td>
+                <b>{{ item.item_code }}</b><br>
+                {{ item.item_name }}
+            </td>
+            <td class="text-center">{{ item.gst_hsn_code or "" }}</td>
+            <td class="text-center">{{ item.qty }} Kgs</td>
+            <td class="text-right">{{ "{:,.2f}".format(item.rate) }}</td>
+            <td class="text-right">{{ "{:,.2f}".format(item.amount) }}</td>
+            {% if has_igst %}
+                <td class="text-right">
+                    {% if item.igst_amount %}
+                        <small>({{ item.igst_rate }}%)</small><br>
+                        {{ "{:,.2f}".format(item.igst_amount) }}
+                    {% else %} - {% endif %}
+                </td>
+            {% else %}
+                <td class="text-right">
+                    {% if item.cgst_amount %}
+                        <small>({{ item.cgst_rate }}%)</small><br>
+                        {{ "{:,.2f}".format(item.cgst_amount) }}
+                    {% else %} - {% endif %}
+                </td>
+                <td class="text-right">
+                    {% if item.sgst_amount %}
+                        <small>({{ item.sgst_rate }}%)</small><br>
+                        {{ "{:,.2f}".format(item.sgst_amount) }}
+                    {% else %} - {% endif %}
+                </td>
+            {% endif %}
+            <td class="text-right bold">{{ "{:,.2f}".format(row_total) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- AGGREGATE TAXES BY RATE (INVOICE) -->
+{%- set taxes_by_rate = {} -%}
+{%- for item in doc.items -%}
+    {%- if has_igst -%}
+        {%- set rate = (item.igst_rate or 0) | float -%}
+        {%- set amt = (item.igst_amount or 0) | float -%}
+        {%- if amt > 0 -%}
+            {%- set key = "IGST @ " ~ (rate | int if rate == rate | int else "{:.1f}".format(rate)) ~ "%" -%}
+            {%- if key not in taxes_by_rate -%}
+                {%- set _ = taxes_by_rate.update({key: amt}) -%}
+            {%- else -%}
+                {%- set _ = taxes_by_rate.update({key: (taxes_by_rate[key] + amt)}) -%}
+            {%- endif -%}
+        {%- endif -%}
+    {%- else -%}
+        {%- set c_rate = (item.cgst_rate or 0) | float -%}
+        {%- set c_amt = (item.cgst_amount or 0) | float -%}
+        {%- if c_amt > 0 -%}
+            {%- set c_key = "CGST @ " ~ (c_rate | int if c_rate == c_rate | int else "{:.1f}".format(c_rate)) ~ "%" -%}
+            {%- if c_key not in taxes_by_rate -%}
+                {%- set _ = taxes_by_rate.update({c_key: c_amt}) -%}
+            {%- else -%}
+                {%- set _ = taxes_by_rate.update({c_key: (taxes_by_rate[c_key] + c_amt)}) -%}
+            {%- endif -%}
+        {%- endif -%}
+        {%- set s_rate = (item.sgst_rate or 0) | float -%}
+        {%- set s_amt = (item.sgst_amount or 0) | float -%}
+        {%- if s_amt > 0 -%}
+            {%- set s_key = "SGST @ " ~ (s_rate | int if s_rate == s_rate | int else "{:.1f}".format(s_rate)) ~ "%" -%}
+            {%- if s_key not in taxes_by_rate -%}
+                {%- set _ = taxes_by_rate.update({s_key: s_amt}) -%}
+            {%- else -%}
+                {%- set _ = taxes_by_rate.update({key: (taxes_by_rate[key] + amt)}) -%}
+            {%- endif -%}
+        {%- endif -%}
+    {%- endif -%}
+{%- endfor -%}
+
+                <table width="100%" class="mt-20 keep-together">
+                    <tr>
+                        <td width="55%" valign="top">
+                            <table class="border" width="100%">
+                                <tr><td class="bold" style="background:#f2f2f2;"> COMPANY BANK DETAILS </td></tr>
+                                <tr><td><b>Bank Name:</b> HDFC Bank Limited<br><b>Branch & IFSC:</b> Madurai | HDFC0001277<br><b>A/c No:</b> 59200037776666<br><b>PAN:</b> AAIFJ4747P</td></tr>
+                            </table>
+                        </td>
+                        <td width="45%" valign="top" style="padding-left: 10px;">
+                            <table class="border" width="100%">
+                                <tr><td>Total Taxable Amount</td><td class="text-right">{{ doc.get_formatted("net_total") }}</td></tr>
+                                
+                                {# Loop through aggregated taxes by rate for Invoice #}
+                                {% for label, total_val in taxes_by_rate.items() %}
+                                    <tr>
+                                        <td>{{ label }}</td>
+                                        <td class="text-right">{{ frappe.format(total_val, "Currency", doc.currency) }}</td>
+                                    </tr>
+                                {% endfor %}
+
+                                <tr class="bold" style="background:#f2f2f2;"><td>Grand Total</td><td class="text-right">{{ doc.get_formatted("grand_total") }}</td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <table class="border mt-10 keep-together" width="100%">
+                    <tr><td class="bold" style="background:#f2f2f2;"> Amount in Words </td></tr>
+                    <tr><td style="text-transform: capitalize;">{{ doc.in_words }}</td></tr>
+                </table>
+
+                <table class="border mt-10 keep-together" width="100%">
+                    <tr><td class="bold" style="background:#f2f2f2;"> TERMS & CONDITIONS </td></tr>
+                    <tr>
+                        <td style="font-size:10px; line-height:1.4;">
+                            {{ doc.terms or "1. Goods once sold will not be taken back.<br>2. Interest @18% will be charged if payment is not made within due date." }}
+                        </td>
+                    </tr>
+                </table>
+
+                <table width="100%" style="margin-top:40px;" class="keep-together">
+                    <tr>
+                        <td width="33%" align="center" valign="bottom"><b>Created By</b><br>{{ frappe.get_fullname(doc.owner) }}</td>
+                        <td width="33%" align="center" valign="bottom"><b>Checked By</b><br>{{ frappe.get_fullname(doc.custom_checked_by or "") }}</td>
+                       <td width="33%" align="right">
+for JAYASHREE SPUN BOND
+<img src=" " style="height:60px; width:150px; display:block; margin-left:auto; margin-right:0; object-fit:contain; object-position:right;">
+<b>Authorised Signatory</b>
+</td>
+                    </tr>
+                </table>
+
+                <div style="text-align: center; font-weight: bold; margin-top: 30px;">
+                    SUBJECT TO MADURAI JURISDICTION<br>
+                    This is a Computer Generated {{ doc.doctype }}
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>

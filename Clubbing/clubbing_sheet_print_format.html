@@ -1,0 +1,104 @@
+<style>
+    .clubbing-header {
+        background-color: #d1e7dd;
+        text-align: center;
+        font-weight: bold;
+        padding: 5px;
+        border: 1px solid #dee2e6;
+    }
+    .clubbing-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .clubbing-table th {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        text-align: center;
+        text-transform: uppercase;
+        font-size: 12px;
+    }
+    .clubbing-table td {
+        border: 1px solid #dee2e6;
+        padding: 10px;
+        font-size: 14px;
+    }
+    .green-cell {
+        background-color: #90ee90;
+        font-weight: bold;
+    }
+    .light-blue-cell {
+        background-color: #e0f7fa;
+    }
+    .loading-tag {
+        font-weight: bold;
+        color: #155724;
+        background-color: #d4edda;
+        border-radius: 4px;
+        padding: 2px 5px;
+        font-size: 10px;
+        float: right;
+    }
+</style>
+
+<div class="row section-break">
+    <div class="col-xs-12 text-center">
+        <h2>CLUBBING SHEET</h2>
+        <p>
+            <strong>Logistics Partner:</strong> {{ doc.logistics_partner }} | 
+            <strong>Vehicle:</strong> {{ doc.vehicle_no }} {% if doc.vehicle_feet %}({{ doc.vehicle_feet }}){% endif %} | 
+            <strong>Trip ID:</strong> {{ doc.trip_id or 'N/A' }}
+        </p>
+    </div>
+</div>
+
+<table class="clubbing-table">
+    <thead>
+        <tr>
+            <th style="width: 5%">S.NO</th>
+            <th style="width: 35%">CUSTOMER / ORDER</th>
+            <th style="width: 10%">ROLLS</th>
+            <th style="width: 15%">KGS</th>
+            <th style="width: 15%">TOTAL</th>
+            <th style="width: 20%">PARTY LOCATION</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+        <tr>
+            <td class="text-center">{{ loop.index }}</td>
+            <td class="green-cell">
+                {{ frappe.db.get_value("Customer", item.customer, "customer_name") or item.customer }} 
+                <br><small>{{ item.sales_order }} {% if item.party_code %} | {{ item.party_code }}{% endif %}</small>
+                <span class="loading-tag">{{ item.loading_sequence }}</span>
+            </td>
+            <td class="text-center">{{ item.no_of_rolls }}</td>
+            <td class="text-center">{{ item.weight_kgs }}</td>
+            {% if loop.first %}
+            <td rowspan="{{ doc.items|length }}" class="text-center" style="vertical-align: middle; font-weight: bold;">
+                {{ doc.total_weight }}
+            </td>
+            {% endif %}
+            <td class="text-center">
+                {{ item.party_location }}
+                {% if item.loading_sequence == "Inside" %}
+                <br><small>(Load First - Inside)</small>
+                {% elif item.loading_sequence == "Outside" %}
+                <br><small>(Load Last - Outside)</small>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="row" style="margin-top: 20px;">
+    <div class="col-xs-6">
+        <p><strong>Planned By:</strong> {{ doc.owner }}</p>
+        <p><strong>Date:</strong> {{ frappe.utils.getdate(doc.posting_date).strftime('%d-%m-%Y') }}</p>
+    </div>
+    <div class="col-xs-6 text-right">
+        <p><strong>Vidyuth Logistics Signature</strong></p>
+        <div style="height: 50px; border-bottom: 1px solid #000; width: 200px; float: right;"></div>
+    </div>
+</div>

@@ -1,0 +1,319 @@
+<!-- ============================================================
+     SHAFT PRODUCTION RUN – PRINT FORMAT
+     Format Type  : Jinja
+     DocType      : Shaft Production Run
+     ============================================================ -->
+
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body,
+    .print-format {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        color: #222;
+        background: #fff;
+    }
+
+    .page-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 10px 14px 18px;
+    }
+
+    /* ── Company Header ── */
+    .company-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #2e7d32;
+        background: #fff;
+        padding: 10px 16px;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .company-header .logo img {
+        height: 72px;
+        width: auto;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .company-header h1 {
+        font-size: 22px;
+        font-weight: 900;
+        color: #000;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        line-height: 1.2;
+        margin-top: 4px;
+    }
+
+    .company-header .doc-title {
+        font-size: 11px;
+        color: #000;
+        font-weight: 800;
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+
+    /* ── Info Row ── */
+    .info-row {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+    }
+
+    .info-row td {
+        border: 1px solid #000;
+        padding: 0;
+    }
+
+    .info-cell {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .info-cell .label {
+        background: #f57f17;
+        color: #fff;
+        font-size: 8px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 2px 5px;
+        letter-spacing: 0.4px;
+        text-align: center;
+    }
+
+    .info-cell .value {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #222;
+        padding: 3px 5px;
+        text-align: center;
+    }
+
+    /* ── Section heading ── */
+    .section-heading {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #000;
+        background: #f57f17;
+        border: 1px solid #000;
+        border-bottom: none;
+        padding: 4px 10px;
+        text-align: center;
+    }
+
+    .section-block {
+        margin-bottom: 10px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    /* ── Tables ── */
+    table.dt {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        border: 1px solid #000;
+    }
+
+    table.dt thead th {
+        background: #ffb74d;
+        border: 1px solid #000;
+        padding: 5px 6px;
+        font-weight: 700;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #000;
+        text-align: center;
+    }
+
+    table.dt tbody td {
+        border: 1px solid #000;
+        padding: 4px 6px;
+        color: #111;
+        background: #fff;
+        vertical-align: middle;
+        text-align: center;
+        word-break: break-word;
+    }
+
+    table.dt tbody tr:nth-child(even) td {
+        background: #fafafa;
+    }
+
+    table.dt tfoot td {
+        border: 1px solid #000;
+        padding: 5px 6px;
+        font-weight: 700;
+        background: #c8e6c9;
+        font-size: 10px;
+        text-align: center;
+        color: #1b5e20;
+    }
+
+    .tr {
+        text-align: right;
+    }
+
+    .tc {
+        text-align: center;
+    }
+
+    @media print {
+        body {
+            margin: 0;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 8mm 10mm;
+        }
+    }
+</style>
+
+<div class="page-wrapper">
+
+    <!-- ═════════ HEADER ═════════ -->
+    <div class="company-header">
+        <div class="logo">
+            <img src="/private/files/JSB LOGO63b225.png" alt="JSB Logo" />
+        </div>
+        <h1>Jayashree Spun Bond</h1>
+        <div class="doc-title">Shaft Production Run &nbsp;|&nbsp; {{ doc.name }}</div>
+    </div>
+
+    <!-- ═════════ INFO CARDS ═════════ -->
+    <table class="info-row" style="margin-bottom: 15px;">
+        <tr>
+            <td style="width: 25%;">
+                <div class="info-cell">
+                    <div class="label">Date</div>
+                    <div class="value">{{ frappe.format(doc.run_date or doc.posting_date, {'fieldtype':'Date'}) if
+                        doc.run_date or doc.posting_date else "—" }}</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="info-cell">
+                    <div class="label">Shift</div>
+                    <div class="value">{{ doc.shift or "—" }}</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="info-cell">
+                    <div class="label">Unit</div>
+                    <div class="value">{{ doc.custom_unit or "—" }}</div>
+                </div>
+            </td>
+            <td style="width: 25%;">
+                <div class="info-cell">
+                    <div class="label">Order Code</div>
+                    <div class="value">{{ doc.custom_order_code or "—" }}</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ═════════ PRODUCTION ROLLS ═════════ -->
+    <div class="section-block">
+        <div class="section-heading">Roll Production Results</div>
+        <table class="dt">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">S.No</th>
+                    <th style="width: 11%;">Quality</th>
+                    <th style="width: 11%;">Colour</th>
+                    <th style="width: 8%;">GSM</th>
+                    <th style="width: 8%;">Width (Inches)</th>
+                    <th style="width: 5%;">Job</th>
+                    <th style="width: 12%; white-space: nowrap;">Batch No</th>
+                    <th style="width: 10%;">Order Code</th>
+                    <th style="width: 10%;" class="tr">Meter / Roll (Mtrs)</th>
+                    <th style="width: 10%;" class="tr">Net Weight (Kgs)</th>
+                    <th style="width: 10%;" class="tr">Gross Weight (Kgs)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(count=1, total_meter=0, total_net=0, total_gross=0) %}
+                {% if doc.items %}
+                {% for row in doc.items %}
+                {% if (row.net_weight|float > 0) or (row.gross_weight|float > 0) %}
+                <tr>
+                    <td class="tc">{{ ns.count }}</td>
+                    <td class="tc">{{ row.quality or row.custom_quality or '' }}</td>
+                    <td class="tc">{{ row.colour or row.color or row.custom_color or row.custom_colour or '' }}</td>
+                    <td class="tc">{{ row.gsm or row.custom_gsm or '' }}</td>
+                    <td class="tc">{{ row.width or row.width_inch or row.custom_width_inch or row.custom_width or '' }}
+                    </td>
+                    <td class="tc">{{ row.job or '' }}</td>
+                    <td style="white-space: nowrap;">{{ row.batch_no or '' }}</td>
+                    <td>{{ row.custom_order_code or row.party_code or row.custom_party_code or row.order_code or '' }}
+                    </td>
+                    <td class="tr">{{ row.meter_roll or row.meter__roll_mtrs or row.custom_meter_roll or
+                        row.meter_per_roll or row.length or '' }}</td>
+                    <td class="tr">{{ "%.2f"|format(row.net_weight or 0) }}</td>
+                    <td class="tr">{{ "%.2f"|format(row.gross_weight or 0) }}</td>
+                </tr>
+                {% set ns.count = ns.count + 1 %}
+                {% set ns.total_meter = ns.total_meter + (row.meter_roll or row.meter__roll_mtrs or
+                row.custom_meter_roll or row.meter_per_roll or row.length or 0)|float %}
+                {% set ns.total_net = ns.total_net + (row.net_weight|float) %}
+                {% set ns.total_gross = ns.total_gross + (row.gross_weight|float) %}
+                {% endif %}
+                {% endfor %}
+                {% if ns.count == 1 %}
+                <tr>
+                    <td colspan="11" class="tc">No rolls with weight entered yet.</td>
+                </tr>
+                {% endif %}
+                {% else %}
+                <tr>
+                    <td colspan="11" class="tc">No roll data found.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="8" class="tr">Total</td>
+                    <td class="tr">{{ ns.total_meter|int if ns.total_meter == ns.total_meter|int else
+                        "%.2f"|format(ns.total_meter) }}</td>
+                    <td class="tr">{{ "%.2f"|format(ns.total_net) }}</td>
+                    <td class="tr">{{ "%.2f"|format(ns.total_gross) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- ═════════ SIGNATURES ═════════ -->
+    <table style="width: 100%; margin-top: 35px; border-top: 1px solid #000; padding-top: 10px;">
+        <tr>
+            <td style="width: 33%; text-align: center;">
+                <div style="border-bottom: 1px solid #000; height: 35px; margin: 0 10px;"></div>
+                <div style="font-size: 8px; margin-top: 5px;">OPERATOR: {{ (frappe.db.get_value("Employee",
+                    doc.custom_operator, "employee_name") or doc.custom_operator or "—")|upper }}</div>
+            </td>
+            <td style="width: 33%; text-align: center;">
+                <div style="border-bottom: 1px solid #000; height: 35px; margin: 0 10px;"></div>
+                <div style="font-size: 8px; margin-top: 5px;">SUPERVISOR: {{ (frappe.db.get_value("Employee",
+                    doc.custom_supervisor, "employee_name") or doc.custom_supervisor or "—")|upper }}</div>
+            </td>
+            <td style="width: 33%; text-align: center;">
+                <div style="border-bottom: 1px solid #000; height: 35px; margin: 0 10px;"></div>
+                <div style="font-size: 8px; margin-top: 5px;">AUTHORISED SIGNATORY</div>
+            </td>
+        </tr>
+    </table>
+
+</div>

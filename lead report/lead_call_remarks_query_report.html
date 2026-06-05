@@ -1,0 +1,287 @@
+{%
+var total_calls = data ? data.length : 0;
+var _findVal = function(row, search) {
+if (!row) return "";
+var s = search.toLowerCase().replace(/[^a-z0-9]/g, "");
+for (var k in row) {
+var kk = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+if (kk.indexOf(s) !== -1) return (row[k] || "").toString();
+}
+return "";
+};
+var _strip = function(v) {
+if (v === null || v === undefined) return "";
+var s = (typeof v === "string") ? v : String(v);
+return s.replace(/<[^>]*>?/gm, "").trim();
+    };
+    var _lower = function(v){ return (v||"").toString().toLowerCase(); };
+    var _fmt = function(v){
+    if (v === null || v === undefined || v === "") return "0";
+    var n = parseFloat(v);
+    if (isNaN(n) || Math.abs(n) < 0.0000001) return isNaN(n) ? String(v) : "0" ; var s=n.toString(); return
+        s.indexOf(".") !==-1 ? s.replace(/\.?0+$/, "" ) : s; }; var _get=function(keys){ if (typeof
+        filters==="undefined" || !filters) return "" ; for (var i=0;i<keys.length;i++) if (filters[keys[i]]) return
+        filters[keys[i]]; return "" ; }; var date_range=(_get(["from_date"]) && _get(["to_date"])) ?
+        (_get(["from_date"]) + " to " + _get(["to_date"])) : frappe.datetime.get_today(); var owner_id=total_calls ?
+        (_findVal(data[0], "opportunity owner" ) || _findVal(data[0], "owner" ) || "" ) : "" ; var owner_val=owner_id;
+        var _now=new Date(); var _pad=function(n) { return n < 10 ? ("0" + n) : String(n); }; var
+        generated_at=_pad(_now.getDate()) + "-" + _pad(_now.getMonth() + 1) + "-" + _now.getFullYear() + " " +
+        _pad(_now.getHours()) + ":" + _pad(_now.getMinutes()) + ":" + _pad(_now.getSeconds()); var
+        logo_path="/files/Logo for Website Header1.png" ; var _origin=(typeof window !=="undefined" && window.location
+        && window.location.origin) ? window.location.origin : "" ; var logo_url_raw=(logo_path &&
+        (logo_path.indexOf("http://")===0 || logo_path.indexOf("https://")===0)) ? logo_path : (_origin ? (_origin +
+        logo_path) : logo_path); var logo_url=encodeURI(logo_url_raw); var
+        sales_groups=["Lead","Prospect","MQL/SQL","Proposal","Sample","MD Contacted","Negotiation","Won","Lost"]; var
+        sales_group_counts={}; sales_groups.forEach(g=> sales_group_counts[g]=0);
+        var call_statuses = ["Not Reachable","Call Dis-Connected","Call Connected","Switch Off","Line Busy"];
+        var call_status_counts = {}; call_statuses.forEach(s => call_status_counts[s]=0);
+        var follow_ups = ["Initial Call","Follow Up - 1","Follow Up - 2","Follow Up - 3","Follow Up - 4"];
+        var follow_up_counts = {}; follow_ups.forEach(s => follow_up_counts[s]=0);
+
+        for (var i=0; i<total_calls; i++) { var r=data[i]; var sg=_strip(_findVal(r,"custom sales group") ||
+            _findVal(r,"sales group") || _findVal(r,"sales stage")); var raw=_lower(sg); var mapped="Unknown" ; if
+            (raw.indexOf("lead") !==-1) mapped="Lead" ; else if (raw.indexOf("prospect") !==-1) mapped="Prospect" ; else
+            if (raw.indexOf("mql") !==-1 || raw.indexOf("sql") !==-1 || raw.indexOf("qualif") !==-1) mapped="MQL/SQL" ;
+            else if (raw.indexOf("propos") !==-1 || raw.indexOf("quote") !==-1) mapped="Proposal" ; else if
+            (raw.indexOf("sample") !==-1) mapped="Sample" ; else if (raw.indexOf("md contact") !==-1)
+            mapped="MD Contacted" ; else if (raw.indexOf("negotiat") !==-1) mapped="Negotiation" ; else if
+            (raw.indexOf("won") !==-1 || raw.indexOf("convert") !==-1) mapped="Won" ; else if (raw.indexOf("lost")
+            !==-1) mapped="Lost" ; if (sales_group_counts[mapped] !==undefined) sales_group_counts[mapped]++; var
+            cs=_lower(_strip(_findVal(r,"call status"))); var mcs="Unknown" ; if (cs.indexOf("not reach") !==-1)
+            mcs="Not Reachable" ; else if (cs.indexOf("dis-connect") !==-1 || cs.indexOf("disconnect") !==-1)
+            mcs="Call Dis-Connected" ; else if (cs.indexOf("connect") !==-1) mcs="Call Connected" ; else if
+            (cs.indexOf("switch") !==-1) mcs="Switch Off" ; else if (cs.indexOf("busy") !==-1) mcs="Line Busy" ; if
+            (call_status_counts[mcs] !==undefined) call_status_counts[mcs]++; var fu=_lower(_strip(_findVal(r,"follow up
+            status") || _findVal(r,"follow up stages") || _findVal(r,"follow up"))); var mfu="Unknown" ; if
+            (fu.indexOf("initial") !==-1) mfu="Initial Call" ; else if (fu.indexOf("1") !==-1) mfu="Follow Up - 1" ;
+            else if (fu.indexOf("2") !==-1) mfu="Follow Up - 2" ; else if (fu.indexOf("3") !==-1) mfu="Follow Up - 3" ;
+            else if (fu.indexOf("4") !==-1) mfu="Follow Up - 4" ; if (follow_up_counts[mfu] !==undefined)
+            follow_up_counts[mfu]++; } %} <div style="font-family: Arial, sans-serif; font-size: 11px;">
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+                <tr>
+                    <td colspan="10" style="border: 1px solid #000; padding: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; border: none;">
+                            <tr>
+                                <td style="border: none; width: 260px;"></td>
+                                <td
+                                    style="border: none; text-align: center; font-weight: bold; font-size: 16px; line-height: 1.2; padding: 10px 0; vertical-align: middle;">
+                                    CRM - New Leads - Individual Call Report
+                                </td>
+                                <td
+                                    style="border: none; width: 260px; text-align: right; vertical-align: middle; padding-left: 10px;">
+                                    <img src="{%= logo_url %}"
+                                        style="display: inline-block; max-height: 72px; max-width: 260px; object-fit: contain;">
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="5"
+                        style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">
+                        Opportunity Owner / ID</td>
+                    <td colspan="5"
+                        style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">
+                        {%= owner_val %}</td>
+                </tr>
+                <tr>
+                    <td colspan="5"
+                        style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">
+                        Report Generated</td>
+                    <td colspan="5"
+                        style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">
+                        {%= generated_at %}</td>
+                </tr>
+                <tr>
+                    <td colspan="10"
+                        style="background-color: #92D050 !important; font-weight: bold; text-align: center; padding: 4px; border: 1px solid #000; vertical-align: middle;">
+                        Call Summary Report</td>
+                </tr>
+                <tr>
+                    <td colspan="4" style="border: 1px solid #000; padding: 4px; vertical-align: middle;"><b>Date Range
+                            : </b>{%= date_range %}</td>
+                    <td colspan="3" style="border: 1px solid #000; padding: 4px; vertical-align: middle;"><b>Total
+                            Calls : </b>{%= total_calls %}</td>
+                    <td colspan="3" style="border: 1px solid #000; padding: 4px; vertical-align: middle;"><b>Total
+                            Duration : </b>00:00:00</td>
+                </tr>
+
+                <tr>
+                    <td colspan="10" style="border: 1px solid #000; padding: 0;">
+                        <table style="width: 100%; border-collapse: collapse; border: none;">
+                            <tr style="background-color: #92D050 !important; font-weight: bold; text-align: center;">
+                                <td style="border: 1px solid #000; padding: 4px; width: 33%;">Sales Group</td>
+                                <td style="border: 1px solid #000; padding: 4px; width: 33%;">Call Status Summary</td>
+                                <td style="border: 1px solid #000; padding: 4px; width: 34%;">Follow Up Summary</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
+                                    <table style="width: 100%; border-collapse: collapse; border: none;">
+                                        {% for (var i=0;i<sales_groups.length;i++){ var g=sales_groups[i]; %} <tr>
+                                            <td style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px;">
+                                                {%= g %}</td>
+                                            <td
+                                                style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px; text-align: right; font-weight: bold;">
+                                                {%= sales_group_counts[g] %}</td>
+                            </tr>
+                            {% } %}
+                        </table>
+                    </td>
+                    <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
+                        <table style="width: 100%; border-collapse: collapse; border: none;">
+                            {% for (var i=0;i<call_statuses.length;i++){ var s=call_statuses[i]; %} <tr>
+                                <td style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px;">{%= s %}</td>
+                                <td
+                                    style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px; text-align: right; font-weight: bold;">
+                                    {%= call_status_counts[s] %}</td>
+                </tr>
+                {% } %}
+            </table>
+            </td>
+            <td style="border: 1px solid #000; padding: 0; vertical-align: top;">
+                <table style="width: 100%; border-collapse: collapse; border: none;">
+                    {% for (var i=0;i<follow_ups.length;i++){ var f=follow_ups[i]; %} <tr>
+                        <td style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px;">{%= f %}</td>
+                        <td
+                            style="border-bottom: 1px solid #eee; padding: 3px; font-size: 10px; text-align: right; font-weight: bold;">
+                            {%= follow_up_counts[f] %}</td>
+                        </tr>
+                        {% } %}
+                </table>
+            </td>
+            </tr>
+            </table>
+            </td>
+            </tr>
+            </table>
+            </div>
+
+            <div style="font-family: Arial, sans-serif; font-size: 11px; margin-top: 5px; page-break-before: always;">
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+
+                    <tr>
+                        <td colspan="10"
+                            style="background-color: #92D050 !important; font-weight: bold; text-align: center; padding: 4px; border: 1px solid #000; vertical-align: middle;">
+                            Total Call Summary</td>
+                    </tr>
+                    <tr style="font-weight:bold;text-align:center;background:#f4f4f4; vertical-align: middle;">
+                        <td style="border:1px solid #000;padding:4px;width:3%;">S.NO</td>
+                        <td style="border:1px solid #000;padding:4px;width:8%;">Date</td>
+                        <td colspan="2" style="border:1px solid #000;padding:4px;width:18%;">Company Name / City</td>
+                        <td style="border:1px solid #000;padding:4px;width:7%;">Requirement</td>
+                        <td colspan="2" style="border:1px solid #000;padding:4px;width:30%;">Requirement Details</td>
+                        <td style="border:1px solid #000;padding:4px;width:8%;">Quantity</td>
+                        <td colspan="2" style="border:1px solid #000;padding:4px;width:26%;">Remarks</td>
+                    </tr>
+                    {% for (var i=0; i<total_calls; i++) { var r=data[i]; var org=_strip(_findVal(r,"company name") ||
+                        _findVal(r,"customer name") || _findVal(r,"party name") || _findVal(r,"customer")); var
+                        city=_strip(_findVal(r, "city" )); var sg=_strip(_findVal(r,"custom sales group") ||
+                        _findVal(r,"sales group") || _findVal(r,"sales stage")); var is_lead=(_lower(sg)==="lead" ); var
+                        req=_strip(_findVal(r,"requirement")); var req_l=_lower(req); var
+                        show_fabric=(req_l.indexOf("fabric") !==-1); var show_bag=(req_l.indexOf("bag") !==-1); var
+                        fabric_qty=_strip(_findVal(r,"fabric requirement") || _findVal(r,"fabric need")); var
+                        bag_qty=_strip(_findVal(r,"bag quantity") || _findVal(r,"bag need")); var
+                        f_qual_val=_strip(_findVal(r, "custom_quality" )); var
+                        f_qual_label=(f_qual_val.toLowerCase()==="other" ) ? "Other Quality" : "Fabric Qual" ; var
+                        f_qual_display=(f_qual_val.toLowerCase()==="other" ) ? _strip(_findVal(r, "custom_other_quality"
+                        )) : f_qual_val; var b_qual_val=_strip(_findVal(r, "custom_bag_quality" )); var
+                        b_qual_label=(b_qual_val.toLowerCase()==="other" ) ? "Other Quality" : "Bag Qual" ; var
+                        b_qual_display=(b_qual_val.toLowerCase()==="other" ) ? _strip(_findVal(r, "custom_other_quality"
+                        )) : b_qual_val; %} <tr>
+                        <td style="border:1px solid #000;padding:2px;text-align:center;vertical-align:top;">{%= i+1 %}
+                        </td>
+                        <td style="border:1px solid #000;padding:2px;vertical-align:top;">
+                            {%= _strip(_findVal(r,"date")) %}
+                            {% var t = _strip(_findVal(r,"time") || _findVal(r,"recording length")); %}
+                            {% if (t) { %}<br><span style="font-size:9px;color:#555;">{%= t %}</span>{% } %}
+                        </td>
+                        <td colspan="2" style="border:1px solid #000;padding:2px;vertical-align:top;">
+                            <div style="font-weight: 600; font-size: 10px;">{%= org %}</div>
+                            {% if (city) { %}<div style="font-size: 9px; color: #444; margin-bottom: 2px;"><b>City:</b>
+                                {%= city %}</div>{% } %}
+                            <div
+                                style="margin-top: 2px; border: 1px solid #000; background-color: #ffffff; padding: 2px; font-size: 8px; line-height: 1.1; border-radius: 2px;">
+                                <div><b>Stage</b>: {% if (sg) { %}{% if (is_lead) { %}LEAD{% } else { %}{%= sg %}{% }
+                                    %}{% } else { %}-{% } %}</div>
+                                <div><b>Status</b>: {%= _strip(_findVal(r,"call status")) || "-" %}</div>
+                                <div><b>Follow</b>: {%= _strip(_findVal(r,"follow up status") || _findVal(r,"follow up
+                                    stages") || _findVal(r,"follow up")) || "-" %}</div>
+                            </div>
+                        </td>
+                        <td style="border:1px solid #000;padding:2px;vertical-align:top;">{%= req || "-" %}</td>
+                        <td colspan="2" style="border:1px solid #000;padding:2px;vertical-align:top;">
+                            {% if (show_fabric) { %}
+                            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-bottom: 4px; font-size: 9px; line-height: 1.2;">
+                                <tr>
+                                    <td colspan="2" style="border: 1px solid #000; text-align: center; font-weight: bold; padding: 3px; font-size: 10px;">FABRIC</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{%= f_qual_label %}</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_qual = f_qual_display || '-'; %}{%= (!f_qual || f_qual === '-') ? '' : f_qual %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Colour</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_clr = _strip(_findVal(r, "custom_colour")); %}{%= (!f_clr || f_clr === '-') ? '' : f_clr %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Gsm</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_gsm = _strip(_findVal(r, "custom_gsm")); %}{%= (!f_gsm || f_gsm === '-') ? '' : f_gsm %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Width</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_wd = _strip(_findVal(r, "custom__width")); %}{%= (!f_wd || f_wd === '-') ? '' : f_wd %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Machinery</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_mch = _strip(_findVal(r, "custom_fabric_machinery_details")); %}{%= (!f_mch || f_mch === '-') ? '' : f_mch %}</td>
+                                </tr>
+                            </table>
+                            {% } %}
+                            {% if (show_bag) { %}
+                            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 9px; line-height: 1.2;">
+                                <tr>
+                                    <td colspan="2" style="border: 1px solid #000; text-align: center; font-weight: bold; padding: 3px; font-size: 10px;">BAG</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Type</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_typ = _strip(_findVal(r, "custom_bag_type")); %}{%= (!b_typ || b_typ === '-') ? '' : b_typ %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{%= b_qual_label %}</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_qual = b_qual_display || '-'; %}{%= (!b_qual || b_qual === '-') ? '' : b_qual %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Colour</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_clr = _strip(_findVal(r, "custom_colour")); %}{%= (!b_clr || b_clr === '-') ? '' : b_clr %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Gsm</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_gsm = _strip(_findVal(r, "custom_bag_gsm") || _findVal(r, "bag gsm")); %}{%= (!b_gsm || b_gsm === '-') ? '' : b_gsm %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Size</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_sz = _strip(_findVal(r, "custom_bag_size")); %}{%= (!b_sz || b_sz === '-') ? '' : b_sz %}</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Machinery</td>
+                                    <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_mch = _strip(_findVal(r, "custom_machinery_details")); %}{%= (!b_mch || b_mch === '-') ? '' : b_mch %}</td>
+                                </tr>
+                            </table>
+                            {% } %}
+                        </td>
+                        <td style="border:1px solid #000;padding:2px;text-align:center;vertical-align:top;">
+                            {% if (show_fabric && show_bag) { %}
+                            <div><b>F</b>: {%= _fmt(fabric_qty) %} Kgs</div>
+                            <div><b>B</b>: {%= _fmt(bag_qty) %} Pieces</div>
+                            {% } else if (show_fabric) { %}
+                            {%= _fmt(fabric_qty) %} Kgs
+                            {% } else if (show_bag) { %}
+                            {%= _fmt(bag_qty) %} Pieces
+                            {% } else { %}-{% } %}
+                        </td>
+                        <td colspan="2" style="border:1px solid #000;padding:2px;vertical-align:top;">{%=
+                            _strip(_findVal(r,"remarks")) %}</td>
+                        </tr>
+                        {% } %}
+                </table>
+            </div>

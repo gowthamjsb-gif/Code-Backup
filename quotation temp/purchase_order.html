@@ -1,0 +1,431 @@
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th,
+    td {
+        padding: 4px;
+    }
+
+    .border th,
+    .border td {
+        border: 1px solid #000;
+    }
+
+    .header-box {
+        border: 1px solid #000;
+        padding: 10px;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .mt-10 {
+        margin-top: 10px;
+    }
+
+    .mt-20 {
+        margin-top: 20px;
+    }
+
+    .address-container {
+        line-height: 1.3;
+    }
+
+    .outside-label {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    .keep-together {
+        page-break-inside: avoid;
+    }
+
+    tr {
+        page-break-inside: auto;
+        page-break-after: auto;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tfoot {
+        display: table-footer-group;
+    }
+
+    .company-logo {
+        max-width: 450px;
+        max-height: 200px;
+        width: auto;
+        height: auto;
+    }
+</style>
+{%- set supplier_addr = frappe.get_doc("Address", doc.supplier_address) if doc.supplier_address else None -%}
+{%- set shipping_addr = frappe.get_doc("Address", doc.shipping_address) if doc.shipping_address else None -%}
+{%- set comp_billing_addr = frappe.get_doc("Address", doc.billing_address) if doc.billing_address else None -%}
+{#— Fetch all company details dynamically from Company module —#}
+{%- set comp_name = frappe.db.get_value("Company", doc.company, "company_name") or doc.company -%}
+{%- set comp_logo = frappe.db.get_value("Company", doc.company, "company_logo") or "" -%}
+{%- set comp_gstin = frappe.db.get_value("Company", doc.company, "gstin") or "" -%}
+{%- set comp_pan = frappe.db.get_value("Company", doc.company, "pan") or "" -%}
+{%- set comp_phone = frappe.db.get_value("Company", doc.company, "phone_no") or "" -%}
+{%- set comp_email = frappe.db.get_value("Company", doc.company, "email") or "" -%}
+{#— Derive GSTIN & state code: prefer comp.gstin, fallback to selected Billing address —#}
+{%- if not comp_gstin and comp_billing_addr -%}
+{%- set comp_gstin = comp_billing_addr.gstin or "" -%}
+{%- endif -%}
+
+{%- set comp_state_code = (comp_gstin[:2] if comp_gstin|length >= 2 else (comp_billing_addr.gst_state_number if
+comp_billing_addr else "")) or "" -%}
+{%- set comp_state = (comp_billing_addr.state if comp_billing_addr else "") or "" -%}
+{%- set comp_city = (comp_billing_addr.city if comp_billing_addr else "") or "" -%}
+<table width="100%" style="border: none;">
+    <thead>
+        <tr>
+            <td style="border: none; padding: 0;">
+                <div class="outside-label">{{ doc.doctype | upper }}</div>
+                <div class="header-box">
+                    <table width="100%" style="border: none;">
+                        <tr>
+                            <td width="60%" valign="top" style="border: none;">
+                                <div class="bold" style="font-size:18px; margin-top:6px; text-transform: uppercase;">
+                                    {{ frappe.get_doc("Company", doc.company).custom_company or "" }}
+                                </div>
+                                <div class="address-container" style="margin-top:6px;">
+
+                                    {%- if comp_billing_addr -%}
+                                    <b> Factory Address : </b> {{ comp_billing_addr.address_line1 or "" }}{% if
+                                    comp_billing_addr.address_line2 %}, {{ comp_billing_addr.address_line2 }}{% endif
+                                    %},<br>
+                                    {{ comp_billing_addr.city or "" }}{% if comp_billing_addr.state %}, {{
+                                    comp_billing_addr.state }}{% endif %}{% if comp_billing_addr.country %} {{
+                                    comp_billing_addr.country }}{% endif %}{% if comp_billing_addr.pincode %} - {{
+                                    comp_billing_addr.pincode }}{% endif %}.<br>
+                                    {%- endif -%}
+
+                                    {% if comp_gstin %}<b>GSTIN :</b> {{ comp_gstin }}<br>{% endif %}
+                                    {% if comp_email %}<b>Email Id:</b> {{ comp_email }}<br>{% endif %}
+                                    {% if comp_phone %}<b>Phone No:</b> {{ comp_phone }}<br>{% endif %}
+                                    {% if comp_state %}<b>State Name:</b> {{ comp_state }} {% if comp_state_code
+                                    %}<b>Code:</b> {{ comp_state_code }}{% endif %}{% endif %}
+                                </div>
+                            </td>
+                            <td width="40%" valign="top" class="text-right" style="border: none;">
+
+                                {% if comp_logo %}<img src="{{ comp_logo }}" class="company-logo"><br>{% endif %}
+                                <div style="line-height: 1.4; margin-top: 5px;">
+                                    <b>PO No :</b> {{ doc.custom_display_po_number or doc.name }} <br>
+                                    <b>Date :</b> {{ doc.transaction_date }} <br>
+                                    <b>Required By Date :</b> {{ doc.schedule_date }}
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <table class="border" width="100%" style="border-top: none;">
+                    <tr>
+                        <td width="50%" valign="top">
+                            <div class="bold">SUPPLIER (Bill From)</div>
+                            <div class="bold">{{ doc.supplier_name }}</div>
+                            <div class="address-container">
+
+                                {% if supplier_addr %}
+
+                                {{ supplier_addr.address_line1 or "" }}<br>
+
+                                {% if supplier_addr.address_line2 %}{{ supplier_addr.address_line2 }}<br>{% endif %}
+
+                                {{ supplier_addr.city or "" }}{% if supplier_addr.state %}, {{ supplier_addr.state }}{%
+                                endif %} {% if supplier_addr.country %}{{ supplier_addr.country }}{% endif %} {{
+                                supplier_addr.pincode or "" }}<br>
+                                {%- set sup_gstin = supplier_addr.gstin or "" -%}
+                                <b>GST No:</b> {{ sup_gstin }}<br>
+                                {%- set db_party_pan = frappe.db.get_value("Supplier", doc.supplier, "pan") if
+                                doc.supplier else "" -%}
+
+                                {%- set sup_pan = supplier_addr.pan or db_party_pan or (sup_gstin[2:12] if
+                                sup_gstin|length >= 12 else "") -%}
+                                <b>PAN:</b> {{ sup_pan }}<br>
+                                {%- set final_sup_phones = [] -%}
+                                {%- set sup_emails = [] -%}
+                                {%- if supplier_addr.phone and supplier_addr.phone | trim not in final_sup_phones -%}
+                                {%- set _ = final_sup_phones.append(supplier_addr.phone | trim) -%}
+                                {%- endif -%}
+
+                                {%- if supplier_addr.mobile_no and supplier_addr.mobile_no | trim not in
+                                final_sup_phones -%}
+                                {%- set _ = final_sup_phones.append(supplier_addr.mobile_no | trim) -%}
+                                {%- endif -%}
+
+                                {%- if supplier_addr.email_id and supplier_addr.email_id | trim not in sup_emails -%}
+                                {%- set _ = sup_emails.append(supplier_addr.email_id | trim) -%}
+                                {%- endif -%}
+                                {%- set sup_contacts = frappe.get_all("Contact",
+                                filters=[["Dynamic Link", "link_doctype", "=", "Supplier"],
+                                ["Dynamic Link", "link_name", "=", doc.supplier]],
+                                fields=["name"]) -%}
+
+                                {%- for c in sup_contacts -%}
+                                {%- set cd = frappe.get_doc("Contact", c.name) -%}
+                                {%- for ph in cd.phone_nos -%}
+                                {%- if ph.phone and ph.phone | trim not in final_sup_phones -%}
+                                {%- set _ = final_sup_phones.append(ph.phone | trim) -%}
+                                {%- endif -%}
+                                {%- endfor -%}
+                                {%- for em in cd.email_ids -%}
+                                {%- if em.email_id and em.email_id | trim not in sup_emails -%}
+                                {%- set _ = sup_emails.append(em.email_id | trim) -%}
+                                {%- endif -%}
+                                {%- endfor -%}
+                                {%- endfor -%}
+                                <b>Phone No:</b> {{ final_sup_phones | join(', ') }}<br>
+                                <b>Email Id:</b> {{ sup_emails | join(', ') }}<br>
+                                {%- set sup_state_code = (sup_gstin[:2] if sup_gstin|length >= 2 else
+                                supplier_addr.gst_state_number) or "" -%}
+                                <b>State Name:</b> {{ supplier_addr.state or "" }} <b>Code:</b> {{ sup_state_code }}
+
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td width="50%" valign="top">
+                            <div class="bold">SHIP TO (Delivery Address)</div>
+                            {%- set ship_gstin_name = "" -%}
+                            {%- if shipping_addr and shipping_addr.gstin -%}
+                            {%- set gstin_company = frappe.db.get_value("Company", {"gstin": shipping_addr.gstin},
+                            "company_name") -%}
+                            {%- set gstin_customer = frappe.db.get_value("Customer", {"gstin": shipping_addr.gstin},
+                            "customer_name") -%}
+                            {%- set gstin_supplier = frappe.db.get_value("Supplier", {"gstin": shipping_addr.gstin},
+                            "supplier_name") -%}
+                            {%- set ship_gstin_name = gstin_company or gstin_customer or gstin_supplier or comp_name -%}
+                            {%- else -%}
+                            {%- set ship_gstin_name = comp_name -%}
+                            {%- endif -%}
+                            <div class="bold">{{ ship_gstin_name }}</div>
+                            <div class="address-container">
+
+                                {% if shipping_addr %}
+
+                                {{ shipping_addr.address_line1 or "" }}<br>
+                                {% if shipping_addr.address_line2 %}{{ shipping_addr.address_line2 }}<br>{% endif %}
+
+                                {{ shipping_addr.city or "" }}{% if shipping_addr.state %}, {{ shipping_addr.state }}{%
+                                endif %} {% if shipping_addr.country %}{{ shipping_addr.country }}{% endif %} {{
+                                shipping_addr.pincode or "" }}<br>
+                                {%- set ship_gstin = shipping_addr.gstin or "" -%}
+                                <b>GST No:</b> {{ ship_gstin }}<br>
+                                {%- set db_comp_pan = comp_pan or frappe.db.get_value("Company", doc.company, "pan") if
+                                doc.company else "" -%}
+                                {%- set comp_pan_val = shipping_addr.pan or db_comp_pan or (ship_gstin[2:12] if
+                                ship_gstin|length >= 12 else "") -%}
+                                <b>PAN:</b> {{ comp_pan_val }}<br>
+                                {% if comp_email %}<b>Email Id:</b> {{ comp_email }}<br>{% endif %}
+                                {% if comp_phone %}<b>Phone No:</b> {{ comp_phone }}<br>{% endif %}
+                                {%- set ship_state_code = (ship_gstin[:2] if ship_gstin|length >= 2 else
+                                shipping_addr.gst_state_number) or "" -%}
+                                <b>State Name:</b> {{ shipping_addr.state or "" }} <b>Code:</b> {{ ship_state_code }}
+
+                                {% else %}
+                                {{ doc.company_address_display or "" }}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                <table class="border mt-10" width="100%">
+                    <tr>
+                        <td width="50%">
+                            <b>PAYMENT TERM</b><br><br>
+
+                            {% if doc.payment_schedule %}
+                            {% for row in doc.payment_schedule %}
+                            {{ row.payment_term }}<br>
+                            {% endfor %}
+                            {% else %}
+                            {{ doc.payment_terms_template or "" }}
+                            {% endif %}
+                        </td>
+                        <td width="50%">
+                            <b>DELIVERY TERM</b><br><br> {{ doc.custom_delivery_terms or "" }}
+                        </td>
+                    </tr>
+                </table>
+                {% set has_igst = doc.items | map(attribute='igst_amount') | sum > 0 %}
+                <table class="border mt-20" width="100%">
+                    <thead>
+                        <tr class="bold text-center" style="background-color: #f2f2f2;">
+                            <th width="3%">No</th>
+                            <th width="22%" class="text-left">Item</th>
+                            <th width="22%" class="text-left">Description</th>
+                            <th width="8%">HSN</th>
+                            <th width="6%">Qty</th>
+                            <th width="10%">Rate (₹)</th>
+                            <th width="12%">Taxable Amt (₹)</th>
+
+                            {% if has_igst %}
+                            <th width="13%">IGST (₹)</th>
+                            {% else %}
+                            <th width="13%">CGST (₹)</th>
+                            <th width="13%">SGST (₹)</th>
+                            {% endif %}
+                            <th width="13%">Total (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for item in doc.items %}
+                        {%- set row_total = item.amount + (item.cgst_amount or 0) + (item.sgst_amount or 0) +
+                        (item.igst_amount or 0) -%}
+                        <tr>
+                            <td class="text-center">{{ loop.index }}</td>
+                            <td>
+                                <b>{{ item.item_code }}</b><br>
+                                {{ item.item_name }}
+                            </td>
+                            <td class="text-left">{{ item.description or "" }}</td>
+                            <td class="text-center">{{ item.gst_hsn_code or "" }}</td>
+                            <td class="text-center">{{ item.qty }} {{ item.uom }}</td>
+                            <td class="text-right">{{ "{:,.2f}".format(item.rate) }}</td>
+                            <td class="text-right">{{ "{:,.2f}".format(item.amount) }}</td>
+
+                            {% if has_igst %}
+                            <td class="text-right">
+                                {% if item.igst_amount %}
+                                <small>({{ item.igst_rate }}%)</small><br>
+                                {{ "{:,.2f}".format(item.igst_amount) }}
+                                {% else %} - {% endif %}
+                            </td>
+                            {% else %}
+                            <td class="text-right">
+                                {% if item.cgst_amount %}
+                                <small>({{ item.cgst_rate }}%)</small><br>
+                                {{ "{:,.2f}".format((item.amount * item.cgst_rate) / 100) }}
+                                {% else %} - {% endif %}
+                            </td>
+                            <td class="text-right">
+                                {% if item.sgst_amount %}
+                                <small>({{ item.sgst_rate }}%)</small><br>
+                                {{ "{:,.2f}".format((item.amount * item.sgst_rate) / 100) }}
+                                {% else %} - {% endif %}
+                            </td>
+                            {% endif %}
+                            <td class="text-right bold">{{ "{:,.2f}".format(row_total) }}</td>
+                        </tr>
+
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <table width="100%" class="mt-20">
+                    <tr>
+                        <td width="55%" valign="top"></td>
+                        <td width="45%" valign="top" style="padding-left: 10px;">
+                            <table class="border" width="100%">
+                                <tr>
+                                    <table class="border" width="100%">
+                                        <tr>
+                                            <td>Total Taxable Amount</td>
+                                            <td class="text-right">{{ doc.get_formatted("net_total") }}</td>
+                                        </tr>
+
+                                        {# Loop through taxes to find P&F and other charges #}
+                                        {% for tax in doc.taxes %}
+                                        {% if tax.category == 'Valuation and Total' or tax.category == 'Total' %}
+                                        {# Skip standard item GST if you are already calculating it from the items table
+                                        above #}
+                                        {# Or simply display every row from the taxes table for accuracy #}
+                                        {% if tax.tax_amount != 0 %}
+                                        <tr>
+                                            <td>{{ tax.description }}</td>
+                                            <td class="text-right">{{ tax.get_formatted("tax_amount") }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endif %}
+                                        {% endfor %}
+
+                                        <tr class="bold" style="background:#f2f2f2;">
+                                            <td>Rounded Total</td>
+                                            <td class="text-right">{{ doc.get_formatted("rounded_total") }}</td>
+                                        </tr>
+                                    </table>
+                        </td>
+                    </tr>
+                </table>
+                <table class="border mt-10" width="100%">
+                    <tr>
+                        <td class="bold" style="background:#f2f2f2;"> Amount in Words </td>
+                    </tr>
+                    <tr>
+                        <td style="text-transform: capitalize;">{{ doc.in_words }}</td>
+                    </tr>
+                </table>
+                {% if doc.custom_notes and doc.custom_notes | trim %}
+                <table class="border mt-10" width="100%">
+                    <tr>
+                        <td class="bold" style="background:#f2f2f2;"> CUSTOM NOTES </td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; line-height:1.4;">
+                            {{ doc.custom_notes }}
+                        </td>
+                    </tr>
+                </table>
+                {% endif %}
+                <table class="border mt-10" width="100%">
+                    <tr>
+                        <td class="bold" style="background:#f2f2f2;"> TERMS &amp; CONDITIONS </td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; line-height:1.4;">
+
+                            {{ doc.terms or "1. Supply subject to approval of material.<br>2. Please mention PO No. on
+                            all Invoices/Challans." }}
+                        </td>
+                    </tr>
+                </table>
+                <table width="100%" style="margin-top:40px;" class="keep-together">
+                    <tr>
+                        <td width="33%" align="center" valign="bottom">
+                            <b>Created By</b><br><br>
+
+                            {{ frappe.get_fullname(doc.owner) }}
+                        </td>
+                        <td width="33%" align="center" valign="bottom">
+                            <b>Checked By</b><br><br>
+
+                            {{ frappe.get_fullname(doc.custom_checked_by or "") }}
+                        </td>
+                        <td width="33%" align="right" valign="bottom">
+
+                            for {{ comp_name | upper }}<br>
+                            <img src="/files/sign.png"
+                                style="height:60px; width:150px; display:block; margin-left:auto; margin-right:0; object-fit:contain; object-position:right;">
+                            <b>Authorised Signatory</b>
+                        </td>
+                    </tr>
+                </table>
+                <div style="text-align: center; font-weight: bold; margin-top: 30px;">
+                    SUBJECT TO {{ comp_city | upper or "MADURAI" }} JURISDICTION<br>
+                    This is a Computer Generated Purchase Order
+                </div>
+            </td>
+        </tr>
+    </thead>
+</table>

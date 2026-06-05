@@ -1,0 +1,51 @@
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Finished Goods</h4>
+    <table class="table table-bordered table-condensed">
+        <thead>
+            <tr>
+                <th>S.No</th>
+                <th>Color</th>
+                <th>GSM</th>
+                <th>Width (Inches)</th>
+                <th>Planned Qty (Kgs)</th>
+                <th>UOM</th>
+                <th>Length (Mtrs)</th>
+                <th>No of Rolls</th>
+                <th>Weight / Roll (Kgs)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in doc.po_items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ row.custom_color or "" }}</td>
+                <td style="text-align: center;">{{ row.custom_gsm or "" }}</td>
+                <td style="text-align: center;">{{ row.custom_width_ or "" }}</td>
+                <td style="text-align: center;">{{ row.get_formatted("planned_qty") }}</td>
+                <td style="text-align: center;">{{ row.stock_uom or row.uom }}</td>
+                <td style="text-align: center;">{{ row.custom_meterperroll or "" }}</td>
+                <td style="text-align: center;">
+                    {% if row.custom_no_of_rolls_ %}
+                    <b>{{ row.custom_no_of_rolls_ }}</b>
+                    {% elif row.custom_gsm and row.custom_width_ and row.custom_meterperroll and row.planned_qty %}
+                    {% set g_weight = (row.custom_gsm | float * row.custom_width_ | float * row.custom_meterperroll |
+                    float * 0.0254 / 1000) %}
+                    <b>{{ (row.planned_qty | float / g_weight) | round(0, 'ceil') | int }}</b>
+                    {% else %}
+                    0
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">
+                    {% if row.custom_gsm and row.custom_width_ and row.custom_meterperroll %}
+                    {% set g_weight = (row.custom_gsm | float * row.custom_width_ | float * row.custom_meterperroll |
+                    float * 0.0254 / 1000) %}
+                    <b>{{ "%.2f" | format(g_weight) }}</b>
+                    {% else %}
+                    {{ row.custom_weight_per_roll or "" }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

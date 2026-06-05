@@ -1,0 +1,200 @@
+{%
+var report_data = data || frappe.query_report.data || [];
+var report_filters = filters || frappe.query_report.get_values() || {};
+
+var detail_rows = [];
+var summary_lines = [];
+var found_summary = false;
+
+/* 1. Separate Detail rows from Summary text */
+for (var i = 0; i < report_data.length; i++) { var row=report_data[i]; var txt=row.summary_text || "" ; if
+  (txt.indexOf("=====") === 0) found_summary = true;
+  if (found_summary) {
+    summary_lines.push(txt);
+  } else {
+    if (row.date) detail_rows.push(row);
+  }
+}
+
+/* 2. Build detail table rows */
+var detail_rows_html = "";
+var total_duration_seconds = 0;
+
+function timeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    var p = timeStr.split(':');
+    var s = 0; var m = 1;
+    while (p.length > 0) {
+        var val = parseInt(p.pop(), 10);
+        if (!isNaN(val)) s += m * val;
+        m *= 60;
+    }
+    return s;
+}
+
+function secondsToTime(s) {
+    var hrs = Math.floor(s / 3600);
+    var mins = Math.floor((s % 3600) / 60);
+    var secs = s % 60;
+    return (hrs < 10 ? " 0" + hrs : hrs) + ":" + (mins < 10 ? "0" + mins : mins) + ":" + (secs < 10 ? "0" + secs :
+  secs); 
+} 
+
+for (var i = 0; i < detail_rows.length; i++) {
+  var r = detail_rows[i];
+  total_duration_seconds += timeToSeconds(r.duration_hms || "00:00:00");
+  
+  var raw_status = r.call_status || "";
+  var s_lower = raw_status.toLowerCase();
+  var final_status = raw_status;
+  
+  if (s_lower.indexOf("dis-connected") !== -1 || s_lower.indexOf("disconnected") !== -1) {
+      final_status = "❌ Call Dis-Connected";
+  } else if (s_lower.indexOf("connected") !== -1) {
+      final_status = "📞 Call Connected";
+  } else if (s_lower.indexOf("busy") !== -1) {
+      final_status = "🔴 Line Busy";
+  } else if (s_lower.indexOf("switch") !== -1) {
+      final_status = "🚫 Switch Off";
+  }
+
+  detail_rows_html += "<tr>" +
+    "<td style='text-align: center;'>" + (i+1) + "</td>" +
+    "<td>" + (r.date || "") + "</td>" +
+    "<td>" + (r.time || "") + "</td>" +
+    "<td>" + (r.duration_hms || "") + "</td>" +
+    "<td>" + (r.customer_name || r.customer || "") + "</td>" +
+    "<td>" + final_status + "</td>" +
+    "<td>" + (r.deals_stages || "") + "</td>" +
+    "<td>" + (r.remarks || "") + "</td>" +
+    "</tr>";
+} 
+
+/* 3. Parse summary
+  lines into blocks */ var blocks=[]; var current_block=null; for (var i=0; i < summary_lines.length; i++) { var
+  line=summary_lines[i]; if (line.indexOf("=====") === 0) {
+    if (current_block) blocks.push(current_block);
+    current_block = [];
+  } else if (current_block !== null) {
+    current_block.push(line);
+  }
+}
+if (current_block) blocks.push(current_block);
+
+/* 4. Build summary blocks HTML */
+var summary_html = "";
+for (var b = 0; b < blocks.length; b++) {
+  var lines = blocks[b];
+  var date_line = "", opening_line = "", closing_line = "", total_calls = "0", total_dur="0", total_won="0"; 
+  var emp_lines=[], cust_lines=[], stage_lines=[], status_lines=[]; 
+  var section="header"; 
+  
+  for (var li=0; li < lines.length; li++) { 
+    var l = lines[li].trim(); 
+    if (l === "-- Calls by Sales Employee --") { section="emp"; continue; } 
+    if (l === "-- Calls by Customer & Stage --") { section="cust"; continue; } 
+    if (l === "-- Calls by Stage --") { section="stage"; continue; } 
+    if (l === "-- Call Status Summary --") { section="status"; continue; } 
+    if (l === "" || l.indexOf("=====") === 0 || l === "CALL SUMMARY REPORT" || l === "CALL SUMMARY REPORT") continue; 
+    if (l.indexOf("---") === 0) continue; 
+    
+    if (l.indexOf("Date") === 0 && l.indexOf("Date&Time") === -1) { date_line = l; continue; } 
+    if (l.indexOf("Opening Date&Time") === 0) { opening_line = l; continue; }
+    if (l.indexOf("Closing Date&Time") === 0) { closing_line = l; continue; }
+    if (l.indexOf("Total Calls") === 0) { total_calls = l.split(":")[1] ? l.split(":")[1].trim() : "0"; continue; } 
+    if (l.indexOf("Total Duration") === 0) { total_dur = l.split(":").slice(1).join(":").trim(); continue; } 
+    if (l.indexOf("Total Won") === 0) { total_won = l.split(":")[1] ? l.split(":")[1].trim() : "0"; continue; } 
+    
+    if (section === "emp") emp_lines.push(l); 
+    else if (section === "cust") cust_lines.push(l); 
+    else if (section === "stage") stage_lines.push(l); 
+    else if (section === "status") status_lines.push(l); 
+  } 
+
+  if (!date_line) continue; 
+  
+  summary_html += "<table class='summary-table'>"; 
+  /* 1. Call Summary Report */ 
+  summary_html += "<tr><td colspan='4' class='header-green'>Call Summary Report</td></tr>"; 
+  summary_html += "<tr>" + "<td>" + date_line + "</td>" + "<td>Total Calls : " + total_calls + "</td>" + "<td>Total Duration : " + total_dur + "</td>" + "<td>Total Won : " + total_won + "</td>" + "</tr>"; 
+  
+  if (opening_line || closing_line) {
+    summary_html += "<tr><td colspan='4' style='text-align: right;'>" + opening_line + "</td></tr>";
+    summary_html += "<tr><td colspan='4' style='text-align: right;'>" + closing_line + "</td></tr>";
+  }
+
+  /* 4. Stages Wise Customer */ 
+  if (stage_lines.length > 0) {
+    var has_stage_data = false;
+    var temp_stage_html = "<tr><td colspan='4' class='sub-header-green'>Stages Wise Customer</td></tr>";
+    for (var j = 0; j < stage_lines.length; j++) { 
+      var line=stage_lines[j].trim(); 
+      var parts=line.split(/\s+-\s+|\s{2,}/);
+      var col1=parts[0] || ""; 
+      var col2=parts[1] || ""; 
+      if (parseInt(col2, 10)> 0) {
+        temp_stage_html += "<tr><td colspan='2'>" + col1 + "</td><td colspan='2'>" + col2 + "</td></tr>";
+        has_stage_data = true;
+      }
+    }
+    if (has_stage_data) {
+      summary_html += temp_stage_html;
+    }
+  }
+
+  /* 5. Call Status Summary */
+  if (status_lines.length > 0) {
+    var has_status_data = false;
+    var temp_status_html = "<tr><td colspan='4' class='sub-header-green'>Call Status Summary</td></tr>";
+    for (var j = 0; j < status_lines.length; j++) { 
+      var line=status_lines[j].trim(); 
+      var parts=line.split(/\s+-\s+|\s{2,}/); 
+      var col1=parts[0] || ""; 
+      var col2=parts[1] || ""; 
+      if (parseInt(col2, 10)> 0) {
+        temp_status_html += "<tr><td colspan='2'>" + col1 + "</td><td colspan='2'>" + col2 + "</td></tr>";
+        has_status_data = true;
+      }
+    }
+    if (has_status_data) {
+      summary_html += temp_status_html;
+    }
+  }
+
+      summary_html += "</table>";
+      }
+
+/* 5. Final Assembly */
+var html_out = "<html>" +
+"<head>" +
+"<style>" +
+"body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11px; }" +
+"table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: auto; }" +
+"th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; }" +
+"th { background-color: #92D050 !important; font-weight: bold !important; color: #000 !important; border: 1px solid #92D050 !important; }" +
+".header-green { background-color: #92D050 !important; font-weight: bold; text-align: center; color: #000; font-size: 13px; }" +
+".sub-header-green { background-color: #92D050 !important; font-weight: bold; color: #000; }" +
+".summary-table { width: 100%; max-width: 850px; margin-top: 15px; }" +
+".summary-table td { border: 1px solid #ddd; }" +
+"tr { page-break-inside: avoid; }" +
+"thead { display: table-header-group; }" +
+"</style>" +
+"</head>" +
+"<body>" +
+"<h2 style='text-align: center; margin-top: 0; margin-bottom: 20px;'>CRM CALL REPORT</h2>" +
+summary_html +
+(detail_rows.length > 0 ? "<table>" +
+    "<thead><tr>" +
+      "<th style='text-align: center;'>S.NO</th>" +
+      "<th>Date</th>" +
+      "<th>Time</th>" +
+      "<th>Recording</th>" +
+      "<th>Customer name</th>" +
+      "<th>Calls status</th>" +
+      "<th>Deals status</th>" +
+      "<th>Remarks</th>" +
+      "</tr></thead><tbody>" + detail_rows_html + "</tbody></table>" : "") +
+"</body>" +
+"</html>";
+%}
+      {%= html_out %}

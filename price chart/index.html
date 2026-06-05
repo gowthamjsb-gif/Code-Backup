@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Price Chart – Quality Grade Pricing</title>
+  <meta name="description" content="ERPNext integrated price chart for 14 quality grades with customer-level premium, discount, and transport pricing."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-icon">₹</div>
+      <div>
+        <h1>Price Chart Manager</h1>
+        <p>Quality Grade Pricing · ERPNext 16 Integration</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" id="btnAddCustomer">＋ Add Customer</button>
+      <button class="btn btn-primary" id="btnExport">↓ Export CSV</button>
+      <button class="btn btn-accent" id="btnSaveERPNext">⬆ Push to ERPNext</button>
+    </div>
+  </header>
+
+  <!-- ── TOOLBAR ── -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-label">Base Price Row:</span>
+      <button class="chip active" id="toggleBaseEdit">Edit Base Prices</button>
+    </div>
+    <div class="toolbar-right">
+      <span class="toolbar-label">Legend:</span>
+      <span class="badge badge-premium">PREMIUM +</span>
+      <span class="badge badge-discount">DISCOUNT −</span>
+      <span class="badge badge-transport">TRANSPORT</span>
+    </div>
+  </div>
+
+  <!-- ── MAIN TABLE WRAPPER ── -->
+  <div class="table-wrapper">
+    <div class="table-scroll">
+      <table id="priceTable">
+        <thead>
+          <tr class="row-head-labels">
+            <th class="col-customer sticky-left" rowspan="2">CUSTOMER NAME</th>
+            <th class="col-transport" rowspan="2">TRANSPORT</th>
+            <th class="col-premium" rowspan="2">PREMIUM</th>
+            <th class="col-discount" rowspan="2">DISCOUNT</th>
+            <!-- Quality columns dynamically inserted -->
+          </tr>
+          <tr class="row-base-prices" id="rowBasePrices">
+            <!-- base price cells injected by JS -->
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- customer rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── ADD / EDIT CUSTOMER MODAL ── -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" id="customerModal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Customer</h2>
+        <button class="modal-close" id="btnModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="inpCustomerName" placeholder="e.g. SELVAM TRADERS"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Transport Charge (₹)</label>
+            <input type="number" id="inpTransport" placeholder="0.00" min="0" step="0.50"/>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="selCategory">
+              <option value="none">None</option>
+              <option value="premium">Premium (+)</option>
+              <option value="discount">Discount (−)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Amount (₹)</label>
+            <input type="number" id="inpAmount" placeholder="0.00" min="0" step="0.50"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btnModalCancel">Cancel</button>
+        <button class="btn btn-primary" id="btnModalSave">Save Customer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOAST ── -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

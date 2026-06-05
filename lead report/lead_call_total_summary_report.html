@@ -1,0 +1,220 @@
+{%
+    var total_calls = data ? data.length : 0;
+    var _findVal = function(row, search) {
+        if (!row) return "";
+        var s = search.toLowerCase().replace(/[^a-z0-9]/g, "");
+        for (var k in row) {
+            var kk = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (kk.indexOf(s) !== -1) return (row[k] || "").toString();
+        }
+        return "";
+    };
+    var _strip = function(v) {
+        if (v === null || v === undefined) return "";
+        var s = (typeof v === "string") ? v : String(v);
+        return s.replace(/<[^>]*>?/gm, "").trim();
+    };
+    var _lower = function(v){ return (v || "").toString().toLowerCase(); };
+    var _fmt = function(v){
+        if (v === null || v === undefined || v === "") return "";
+        var n = parseFloat(v);
+        if (isNaN(n)) return String(v);
+        if (Math.abs(n) < 0.0000001) return "";
+        var s = n.toString();
+        return s.indexOf(".") !== -1 ? s.replace(/\.?0+$/, "") : s;
+    };
+    var _hasQty = function(v) {
+        var s = _fmt(_strip(v));
+        return !!(s && s !== "-");
+    };
+    var _getFilter = function(keys) {
+        if (typeof filters === "undefined" || !filters) return "";
+        for (var i=0; i<keys.length; i++) {
+            if (filters[keys[i]]) return filters[keys[i]];
+        }
+        return "";
+    };
+    var _pad = function(n) { return n < 10 ? ("0" + n) : String(n); };
+
+    var logo_path = "/files/Logo for Website Header1.png";
+    var _origin = (typeof window !== "undefined" && window.location && window.location.origin) ? window.location.origin : "";
+    var logo_url_raw = (logo_path && (logo_path.indexOf("http://") === 0 || logo_path.indexOf("https://") === 0))
+        ? logo_path
+        : (_origin ? (_origin + logo_path) : logo_path);
+    var logo_url = encodeURI(logo_url_raw);
+
+    var summary_rows = [];
+    for (var i=0;i<total_calls;i++){
+        var r = data[i];
+        var req = _strip(_findVal(r,"requirement"));
+        var req_l = _lower(req);
+        var fabric_qty = _strip(_findVal(r,"fabric requirement") || _findVal(r,"fabric need"));
+        var bag_qty = _strip(_findVal(r,"bag quantity") || _findVal(r,"bag need"));
+        var has_fabric_qty = _hasQty(fabric_qty);
+        var has_bag_qty = _hasQty(bag_qty);
+        var show_fabric = (req_l.indexOf("fabric") !== -1);
+        var show_bag = (req_l.indexOf("bag") !== -1);
+
+        if (!show_fabric && !show_bag) {
+            show_fabric = has_fabric_qty;
+            show_bag = has_bag_qty;
+        }
+
+        if ((show_fabric && has_fabric_qty) || (show_bag && has_bag_qty)) {
+            summary_rows.push({
+                row: r,
+                req: req,
+                fabric_qty: fabric_qty,
+                bag_qty: bag_qty,
+                has_fabric_qty: has_fabric_qty,
+                has_bag_qty: has_bag_qty,
+                show_fabric: show_fabric,
+                show_bag: show_bag
+            });
+        }
+    }
+
+    var _now = new Date();
+    var generated_at = _pad(_now.getDate()) + "-" + _pad(_now.getMonth() + 1) + "-" + _now.getFullYear() + " " + _pad(_now.getHours()) + ":" + _pad(_now.getMinutes()) + ":" + _pad(_now.getSeconds());
+    var report_owner = _strip((summary_rows.length ? _findVal(summary_rows[0].row, "opportunity owner") : "") || _getFilter(["user", "opportunity_owner", "owner"]));
+    var date_range = (_getFilter(["from_date"]) && _getFilter(["to_date"])) ? (_getFilter(["from_date"]) + " to " + _getFilter(["to_date"])) : (typeof frappe !== "undefined" ? frappe.datetime.get_today() : "");
+%}
+
+<div style="font-family: Arial, sans-serif; font-size: 11px;">
+<table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+  <tr>
+    <td colspan="10" style="border: 1px solid #000; padding: 8px;">
+      <table style="width: 100%; border-collapse: collapse; border: none;">
+        <tr>
+          <td style="border: none; width: 260px;"></td>
+          <td style="border: none; text-align: center; font-weight: bold; font-size: 16px; line-height: 1.2; padding: 10px 0; vertical-align: middle;">
+            CRM - New Leads - Individual Call Report (Tonnage)
+          </td>
+          <td style="border: none; width: 260px; text-align: right; vertical-align: middle; padding-left: 10px;">
+            <img src="{%= logo_url %}" style="display: inline-block; max-height: 72px; max-width: 260px; object-fit: contain;">
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="5" style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">Opportunity Owner / ID</td>
+    <td colspan="5" style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">{%= report_owner || "-" %}</td>
+  </tr>
+  <tr>
+    <td colspan="5" style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">Report Generated</td>
+    <td colspan="5" style="font-weight: bold; text-align: center; border: 1px solid #000; padding: 4px; vertical-align: middle;">{%= generated_at %}</td>
+  </tr>
+  <tr>
+    <td colspan="10" style="background-color: #92D050 !important; font-weight: bold; text-align: center; padding: 4px; border: 1px solid #000; vertical-align: middle;">Call Summary Report</td>
+  </tr>
+  <tr>
+    <td colspan="10" style="border: 1px solid #000; padding: 4px; vertical-align: middle;"><b>Date Range : </b>{%= date_range %}</td>
+  </tr>
+  <tr style="font-weight:bold;text-align:center;background:#f4f4f4;">
+    <td style="border:1px solid #000;padding:4px;width:3%;">S.NO</td>
+    <td style="border:1px solid #000;padding:4px;width:8%;">Date</td>
+    <td colspan="2" style="border:1px solid #000;padding:4px;width:18%;">Company Name / City</td>
+    <td style="border:1px solid #000;padding:4px;width:7%;">Requirement</td>
+    <td colspan="2" style="border:1px solid #000;padding:4px;width:26%;">Requirement Details</td>
+    <td style="border:1px solid #000;padding:4px;width:8%;">Quantity</td>
+    <td colspan="2" style="border:1px solid #000;padding:4px;width:30%;">Remarks</td>
+  </tr>
+  {% for (var i=0;i<summary_rows.length;i++){ var item=summary_rows[i]; var r=item.row; %}
+  {% var org = _strip(_findVal(r,"company name") || _findVal(r,"customer name") || _findVal(r,"party name") || _findVal(r,"customer")); %}
+  {% var owner = _strip(_findVal(r,"opportunity owner")); %}
+  {% var city = _strip(_findVal(r, "city")); %}
+  {% var sg = _strip(_findVal(r,"custom sales group") || _findVal(r,"sales group") || _findVal(r,"sales stage")); %}
+  {% var is_lead = (_lower(sg) === "lead"); %}
+  <tr>
+    <td style="border:1px solid #000;padding:6px;text-align:center;">{%= i+1 %}</td>
+    <td style="border:1px solid #000;padding:6px;">
+      {%= _strip(_findVal(r,"date")) %}
+      {% var t = _strip(_findVal(r,"time")); %}
+      {% if (t) { %}<br><span style="font-size:10px;color:#555;">{%= t %}</span>{% } %}
+    </td>
+    <td colspan="2" style="border:1px solid #000;padding:6px;">
+      <div style="font-weight: 600;">{%= org %}</div>
+      {% if (city) { %}<div style="font-size: 11px; color: #444; margin-bottom: 2px;"><b>City:</b> {%= city %}</div>{% } %}
+      <div style="margin-top: 6px; border: 1px solid #000; background-color: #ffffff; padding: 4px; font-size: 10px; line-height: 1.35; border-radius: 2px;">
+        <div><b>Sales Stage</b>: {% if (sg) { %}{% if (is_lead) { %}<b>LEAD</b>{% } else { %}{%= sg %}{% } %}{% } else { %}-{% } %}</div>
+        <div><b>Call Status</b>: {%= _strip(_findVal(r,"call status")) || "-" %}</div>
+        <div><b>Follow Up</b>: {%= _strip(_findVal(r,"follow up status") || _findVal(r,"follow up stages") || _findVal(r,"follow up")) || "-" %}</div>
+      </div>
+    </td>
+    <td style="border:1px solid #000;padding:6px;">{%= item.req || "-" %}</td>
+    <td colspan="2" style="border:1px solid #000;padding:2px;vertical-align:top;">
+      {% if (item.show_fabric && item.has_fabric_qty) { %}
+      <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; margin-bottom: 4px; font-size: 10px; line-height: 1.2;">
+        <tr>
+          <td colspan="2" style="border: 1px solid #000; text-align: center; font-weight: bold; padding: 3px; font-size: 11px;">FABRIC</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Quality</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_qual = _strip(_findVal(r,"quality") || _findVal(r,"custom_quality")); %}{%= (!f_qual || f_qual === '-') ? '' : f_qual %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Colour</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_clr = _strip(_findVal(r,"colour") || _findVal(r,"custom_colour")); %}{%= (!f_clr || f_clr === '-') ? '' : f_clr %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">GSM</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_gsm = _strip(_findVal(r,"fabric gsm") || _findVal(r,"custom_gsm")); %}{%= (!f_gsm || f_gsm === '-') ? '' : f_gsm %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Width</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_wd = _strip(_findVal(r,"width") || _findVal(r,"custom__width")); %}{%= (!f_wd || f_wd === '-') ? '' : f_wd %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Machinery</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var f_mch = _strip(_findVal(r,"fabric machinery details") || _findVal(r,"custom_fabric_machinery_details")); %}{%= (!f_mch || f_mch === '-') ? '' : f_mch %}</td>
+        </tr>
+      </table>
+      {% } %}
+      {% if (item.show_bag && item.has_bag_qty) { %}
+      <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 10px; line-height: 1.2;">
+        <tr>
+          <td colspan="2" style="border: 1px solid #000; text-align: center; font-weight: bold; padding: 3px; font-size: 11px;">BAG</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Type</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_typ = _strip(_findVal(r,"bag type") || _findVal(r,"custom_bag_type")); %}{%= (!b_typ || b_typ === '-') ? '' : b_typ %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Quality</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_qual = _strip(_findVal(r,"bag quality") || _findVal(r,"custom_bag_quality")); %}{%= (!b_qual || b_qual === '-') ? '' : b_qual %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Colour</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_clr = _strip(_findVal(r,"colour") || _findVal(r,"custom_colour")); %}{%= (!b_clr || b_clr === '-') ? '' : b_clr %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">GSM</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_gsm = _strip(_findVal(r,"bag gsm") || _findVal(r,"custom_bag_gsm")); %}{%= (!b_gsm || b_gsm === '-') ? '' : b_gsm %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Size</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_sz = _strip(_findVal(r,"bag size") || _findVal(r,"custom_bag_size")); %}{%= (!b_sz || b_sz === '-') ? '' : b_sz %}</td>
+        </tr>
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">Machinery</td>
+          <td style="border: 1px solid #000; text-align: center; padding: 2px; width: 50%;">{% var b_mch = _strip(_findVal(r,"bag machinery details") || _findVal(r,"custom_machinery_details")); %}{%= (!b_mch || b_mch === '-') ? '' : b_mch %}</td>
+        </tr>
+      </table>
+      {% } %}
+    </td>
+    <td style="border:1px solid #000;padding:6px;text-align:center;">
+      {% if (item.show_fabric && item.has_fabric_qty) { %}<div><b>F</b>: {%= _fmt(item.fabric_qty) %} Kgs</div>{% } %}
+      {% if (item.show_bag && item.has_bag_qty) { %}<div><b>B</b>: {%= _fmt(item.bag_qty) %} Pieces</div>{% } %}
+    </td>
+    <td colspan="2" style="border:1px solid #000;padding:6px;">{%= _strip(_findVal(r,"remarks")) %}</td>
+  </tr>
+  {% } %}
+  {% if (!summary_rows.length) { %}
+  <tr>
+    <td colspan="10" style="border:1px solid #000;padding:10px;text-align:center;">No records with quantity found.</td>
+  </tr>
+  {% } %}
+</table>
+</div>
+  

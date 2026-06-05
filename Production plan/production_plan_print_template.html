@@ -1,0 +1,692 @@
+<div class="print-header">
+    <div class="row">
+        <div class="col-xs-7" style="text-align: left;">
+            <h2 style="margin-top:0; color: #17a2b8; font-size: 30px;"><b>Order Planning Sheet</b></h2>
+            <p style="font-size: 14px;"><strong>ID:</strong> {{ doc.name }}</p>
+            <p style="font-size: 14px;"><strong>Order Code:</strong> {{ doc.custom_party_code or "" }}</p>
+            <p style="font-size: 14px;"><strong>Ordered Date:</strong> {{ doc.get_formatted("posting_date") }}</p>
+            <p style="font-size: 14px;"><strong>Progress:</strong> {{ doc.status }}</p>
+        </div>
+
+        <div class="col-xs-5" style="text-align: right;">
+            <div class="total-qty-banner"
+                style="margin-top: 10px; padding: 15px 25px; background-color: #e9f7f9; border: 2px solid #17a2b8; display: inline-block; border-radius: 6px;">
+                <span style="font-size: 18px; color: #333;"><strong>Total Planned Qty:</strong></span>
+                <br>
+                <span style="font-size: 28px; color: #17a2b8; font-weight: bold;">
+                    {% set total_planned_qty = doc.custom_shaft_details|sum(attribute='total_weight_kgs') %}
+                    {{ "%.2f" | format(total_planned_qty) }}
+                    {{ doc.po_items[0].stock_uom if doc.po_items else '' }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr style="border-top: 2px solid #eee; margin-top: 20px;">
+
+<div class="section">
+    <h4 class="section-title">Fabric Specifications</h4>
+    <table class="table table-bordered table-condensed spec-table">
+        <tbody>
+            <tr>
+                <th style="width: 20%;">Quality</th>
+                <td style="width: 30%;">{{ doc.custom_quality or "" }}</td>
+                <th style="width: 20%;">Unit</th>
+                <td style="width: 30%;">{{ doc.custom_unit or "" }}</td>
+            </tr>
+            <tr>
+                <th>Label</th>
+                <td>{{ doc.custom_label or "" }}</td>
+                <th>Packing</th>
+                <td>{{ doc.custom_packing or "" }}</td>
+            </tr>
+            <tr>
+                <th>Fabric Type</th>
+                <td colspan="3">{{ doc.custom_fabric_type or "" }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Special Instructions</h4>
+    <div
+        style="border: 1px solid #d1d1d1; padding: 12px; min-height: 80px; font-size: 12px; background-color: #ffffff; border-radius: 4px; text-align: left; line-height: 1.5;">
+        {% if doc.custom_special_instructions %}
+        {% for line in doc.custom_special_instructions.split('\n') %}
+        {% if line.strip() %}
+        {{ line.strip() }}<br>
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        No special instructions provided.
+        {% endif %}
+    </div>
+</div>
+
+{%- set ns_rmvis = namespace(rows=[]) -%}
+{%- for mr in (doc.mr_items or []) -%}
+{%- set code = mr.item_code -%}
+{%- set ig = (frappe.db.get_value("Item", code, "item_group") if code and frappe.db.exists("Item", code) else None) or "" -%}
+{%- set igl = ig | lower | replace(" ", "") -%}
+{%- set is_finished_like = (igl == "products" or igl == "services" or "finishedgood" in igl or igl.endswith("finishedgoods")) -%}
+{%- set is_raw = (code and ig and not is_finished_like) -%}
+{%- if is_raw -%}{%- set _ = ns_rmvis.rows.append(mr) -%}{%- endif -%}
+{%- endfor -%}
+{%- if ns_rmvis.rows -%}
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Mixing Ratio & Raw Material Requirements</h4>
+
+    {%- set q_master = frappe.get_doc("Quality Master", doc.custom_quality) if doc.custom_quality else None -%}
+    {%- set standard_base = (q_master.pp_kgs or 0) + (q_master.filler_kgs or 0) if q_master else 25.0 -%}
+
+    {# --- DATA FETCHING & AGGREGATION --- #}
+    {%- set item_names = {'pp': [], 'dana': [], 'filler': [], 'ppa': [], 'anti': [], 'mb': []} -%}
+    {%- set item_qtys = {'pp': 0.0, 'dana': 0.0, 'filler': 0.0, 'ppa': 0.0, 'anti': 0.0, 'mb': 0.0} -%}
+    {%- set pp_item_dict = {} -%}
+    {%- set matched_codes = [] -%}
+
+    {%- if doc.mr_items -%}
+    {%- for row in doc.mr_items -%}
+    {%- set iname_raw = row.item_name or row.item_code -%}
+    {%- set iname = iname_raw | lower -%}
+    {%- set ic = row.item_code.upper() -%}
+    {%- set qty = row.get("required_bom_qty") or row.get("bom_qty") or 0.0 -%}
+
+    {# LOGIC: Match items to categories and sum their quantities #}
+
+    {# 1. PPA / SLIP / VISTAMAX #}
+    {%- if "ppa" in iname or "vista" in iname or "slip" in iname or "aid" in iname -%}
+    {%- if iname_raw not in item_names.ppa %}{% if item_names.update({'ppa': item_names.ppa + [iname_raw]}) %}{% endif
+    %}{% endif -%}
+    {%- if item_qtys.update({'ppa': item_qtys.ppa + qty}) -%}{%- endif -%}
+    {%- if matched_codes.append(row.item_code) -%}{%- endif -%}
+
+    {# 2. ANTISTATIC #}
+    {%- elif "anti" in iname or "static" in iname -%}
+    {%- if iname_raw not in item_names.anti %}{% if item_names.update({'anti': item_names.anti + [iname_raw]}) %}{%
+    endif %}{% endif -%}
+    {%- if item_qtys.update({'anti': item_qtys.anti + qty}) -%}{%- endif -%}
+    {%- if matched_codes.append(row.item_code) -%}{%- endif -%}
+
+    {# 3. PP #}
+    {%- elif ic.startswith("PP") or ic.startswith("1002") or "pp" in iname or "poly" in iname or "hp" in iname or "basell" in iname or "rep" in iname -%}
+    {%- if iname_raw in pp_item_dict %}
+    {%- if pp_item_dict.update({iname_raw: pp_item_dict[iname_raw] + qty}) %}{% endif %}
+    {%- else %}
+    {%- if pp_item_dict.update({iname_raw: qty}) %}{% endif %}
+    {%- endif %}
+    {%- if iname_raw not in item_names.pp %}{% if item_names.update({'pp': item_names.pp + [iname_raw]}) %}{% endif %}{%
+    endif -%}
+    {%- if item_qtys.update({'pp': item_qtys.pp + qty}) -%}{%- endif -%}
+    {%- if matched_codes.append(row.item_code) -%}{%- endif -%}
+
+    {# 4. DANA #}
+    {%- elif "dana" in iname -%}
+    {%- if iname_raw not in item_names.dana %}{% if item_names.update({'dana': item_names.dana + [iname_raw]})
+    %}{% endif %}{% endif -%}
+    {%- if item_qtys.update({'dana': item_qtys.dana + qty}) -%}{%- endif -%}
+    {%- if matched_codes.append(row.item_code) -%}{%- endif -%}
+
+    {# 5. FILLER #}
+    {%- elif ic.startswith("FL") or ic.startswith("1003") or "filler" in iname or "fl " in iname or "fl-" in iname or "fill" in iname or "calcium" in iname or "carb" in iname or "talc" in iname or "sw9" in iname -%}
+    {%- if iname_raw not in item_names.filler %}{% if item_names.update({'filler': item_names.filler + [iname_raw]})
+    %}{% endif %}{% endif -%}
+    {%- if item_qtys.update({'filler': item_qtys.filler + qty}) -%}{%- endif -%}
+    {%- if matched_codes.append(row.item_code) -%}{%- endif -%}
+    {%- endif -%}
+    {%- endfor -%}
+
+    {# MASTERBATCH: Sum up anything NOT matched above #}
+    {%- for row in doc.mr_items -%}
+    {%- if row.item_code not in matched_codes -%}
+    {%- set iname_raw = row.item_name or row.item_code -%}
+    {%- if iname_raw not in item_names.mb %}{% if item_names.update({'mb': item_names.mb + [iname_raw]}) %}{% endif %}{%
+    endif -%}
+    {%- set mb_qty = row.get("required_bom_qty") or row.get("bom_qty") or 0.0 -%}
+    {%- if item_qtys.update({'mb': item_qtys.mb + mb_qty}) -%}{%- endif -%}
+    {%- endif -%}
+    {%- endfor -%}
+    {%- endif -%}
+
+    {# --- CALCULATE ONE MIXING RATIO VALUES --- #}
+    {%- set po_row = doc.po_items[0] if doc.po_items else None -%}
+    {# Prefer persisted popup recipe_payload (saved by pp bom creation script) #}
+    {%- set recipe_payload_saved = (po_row.get("custom_recipe_payload") or po_row.get("recipe_payload") or po_row.get("custom_popup_recipe_payload")) if po_row else None -%}
+    {%- set payload = frappe.parse_json(recipe_payload_saved) if recipe_payload_saved else None -%}
+    {%- if payload -%}
+        {%- set r_pp = (payload.get("pp_rows") or []) | sum(attribute="qty") -%}
+        {%- set r_fl = (payload.get("fl_rows") or []) | sum(attribute="qty") -%}
+        {%- set r_ppa = (payload.get("ad_rows") or []) | sum(attribute="qty") -%}
+        {%- set r_anti = 0 -%}
+        {# split additives: first = ppa, second = anti if present #}
+        {%- set ad_rows = payload.get("ad_rows") or [] -%}
+        {%- if ad_rows and (ad_rows | length) > 1 -%}
+            {%- set r_ppa = (ad_rows[0].get("qty") or 0) -%}
+            {%- set r_anti = (ad_rows[1].get("qty") or 0) -%}
+        {%- endif -%}
+        {%- set r_mb = 0 -%}
+        {%- set r_dana = 0 -%}
+    {%- endif -%}
+    {# Popup (Bulk Recipe / Change LDR) kg values only #}
+    {%- set r_pp = (r_pp if r_pp is defined and r_pp else ((po_row.get("pp_kgs") or po_row.get("custom_pp_kgs") or po_row.get("custom_ldr_pp") or po_row.get("custom_change_ldr_pp") or po_row.get("custom_popup_pp")) if po_row else 0))
+        or doc.get("pp_kgs") or doc.get("custom_pp_kgs") or doc.get("custom_ldr_pp") or doc.get("custom_change_ldr_pp") or doc.get("custom_popup_pp")
+        or 0 -%}
+    {%- set r_fl = (r_fl if r_fl is defined and r_fl else ((po_row.get("filler_kgs") or po_row.get("custom_filler_kgs") or po_row.get("custom_ldr_filler") or po_row.get("custom_change_ldr_filler") or po_row.get("custom_popup_filler")) if po_row else 0))
+        or doc.get("filler_kgs") or doc.get("custom_filler_kgs") or doc.get("custom_ldr_filler") or doc.get("custom_change_ldr_filler") or doc.get("custom_popup_filler")
+        or 0 -%}
+    {%- set r_dana = (r_dana if r_dana is defined and r_dana else ((po_row.get("dana_kgs") or po_row.get("custom_dana_kgs") or po_row.get("custom_ldr_dana") or po_row.get("custom_change_ldr_dana") or po_row.get("custom_popup_dana")) if po_row else 0))
+        or doc.get("dana_kgs") or doc.get("custom_dana_kgs") or doc.get("custom_ldr_dana") or doc.get("custom_change_ldr_dana") or doc.get("custom_popup_dana")
+        or 0 -%}
+    {%- set r_ppa = (r_ppa if r_ppa is defined and r_ppa else ((po_row.get("additive_kgs_1") or po_row.get("custom_additive_kgs_1") or po_row.get("ppa_kgs") or po_row.get("custom_ppa_kgs") or po_row.get("custom_ldr_ppa") or po_row.get("custom_change_ldr_ppa") or po_row.get("custom_popup_ppa")) if po_row else 0))
+        or doc.get("additive_kgs_1") or doc.get("custom_additive_kgs_1") or doc.get("ppa_kgs") or doc.get("custom_ppa_kgs") or doc.get("custom_ldr_ppa") or doc.get("custom_change_ldr_ppa") or doc.get("custom_popup_ppa")
+        or 0 -%}
+    {%- set r_anti = (r_anti if r_anti is defined and r_anti else ((po_row.get("additive_kgs_2") or po_row.get("custom_additive_kgs_2") or po_row.get("antistatic_kgs") or po_row.get("custom_antistatic_kgs") or po_row.get("custom_ldr_anti") or po_row.get("custom_change_ldr_anti") or po_row.get("custom_popup_anti")) if po_row else 0))
+        or doc.get("additive_kgs_2") or doc.get("custom_additive_kgs_2") or doc.get("antistatic_kgs") or doc.get("custom_antistatic_kgs") or doc.get("custom_ldr_anti") or doc.get("custom_change_ldr_anti") or doc.get("custom_popup_anti")
+        or 0 -%}
+    {%- set r_mb = (r_mb if r_mb is defined and r_mb else ((po_row.get("mb_kgs") or po_row.get("masterbatch_kgs") or po_row.get("custom_mb_kgs") or po_row.get("custom_masterbatch_kgs") or po_row.get("custom_ldr_mb") or po_row.get("custom_change_ldr_mb") or po_row.get("custom_popup_mb")) if po_row else 0))
+        or doc.get("mb_kgs") or doc.get("masterbatch_kgs") or doc.get("custom_mb_kgs") or doc.get("custom_masterbatch_kgs") or doc.get("custom_ldr_mb") or doc.get("custom_change_ldr_mb") or doc.get("custom_popup_mb")
+        or 0 -%}
+    {# Generic child-table scan for popup-created fields.
+       Popup script uses keys like qty_pp, qty_fl, qty_ad1/2, qty_mb (LDR), etc. #}
+    {%- set ns_ratio = namespace(pp=r_pp, fl=r_fl, ppa=r_ppa, anti=r_anti, mb=r_mb) -%}
+    {%- for child_rows in doc.as_dict().values() -%}
+        {%- if child_rows is iterable and child_rows is not string and child_rows is not mapping -%}
+            {%- for crow in child_rows -%}
+                {%- if crow is mapping -%}
+                    {%- for ck, cv in crow.items() -%}
+                        {%- set k = ck | string | lower -%}
+                        {%- set val = (cv | float) if cv else 0 -%}
+                        {%- if val > 0 and (("kg" in k) or k.startswith("qty_")) -%}
+                            {%- if (k.startswith("qty_pp") or "pp" in k or "poly" in k) and not ns_ratio.pp -%}
+                                {%- set ns_ratio.pp = val -%}
+                            {%- elif (k.startswith("qty_fl") or "filler" in k or "fill" in k or "fl" in k) and not ns_ratio.fl -%}
+                                {%- set ns_ratio.fl = val -%}
+                            {%- elif ((k.startswith("qty_ad1") or k.startswith("qty_ppa") or "ppa" in k or "additive" in k) and ("1" in k)) and not ns_ratio.ppa -%}
+                                {%- set ns_ratio.ppa = val -%}
+                            {%- elif ((k.startswith("qty_ad2") or k.startswith("qty_anti") or "anti" in k or "static" in k or "additive" in k) and ("2" in k)) and not ns_ratio.anti -%}
+                                {%- set ns_ratio.anti = val -%}
+                            {%- elif (("mb" in k or "masterbatch" in k) and not k.startswith("qty_mb") and not ns_ratio.mb) -%}
+                                {%- set ns_ratio.mb = val -%}
+                            {%- endif -%}
+                        {%- endif -%}
+                    {%- endfor -%}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- set r_pp = ns_ratio.pp -%}
+    {%- set r_fl = ns_ratio.fl -%}
+    {%- set r_ppa = ns_ratio.ppa -%}
+    {%- set r_anti = ns_ratio.anti -%}
+    {%- set r_mb = ns_ratio.mb -%}
+    {%- set r_pair_raw = ((po_row.get("custom_one_mixing_ratio") or po_row.get("custom_mixing_ratio") or po_row.get("custom_pp_filler_ratio") or po_row.get("one_mixing_ratio")) if po_row else None)
+        or doc.get("custom_one_mixing_ratio") or doc.get("custom_mixing_ratio") or doc.get("custom_pp_filler_ratio") or doc.get("one_mixing_ratio")
+        or None -%}
+    {# Fallback auto-detect: pick any popup-like ratio field containing pair text such as 100,25 #}
+    {%- if not r_pair_raw -%}
+        {%- set ns = namespace(found_ratio=None) -%}
+        {%- for src in [po_row.as_dict() if po_row else {}, doc.as_dict()] -%}
+            {%- for k, v in src.items() -%}
+                {%- set key_l = (k | string | lower) -%}
+                {%- set val_s = (v | string | trim) if v is not none else "" -%}
+                {%- if not ns.found_ratio and val_s and ("mix" in key_l or "ratio" in key_l or "ldr" in key_l)
+                    and ("," in val_s or "/" in val_s or ":" in val_s or "-" in val_s) -%}
+                    {%- set ns.found_ratio = val_s -%}
+                {%- endif -%}
+            {%- endfor -%}
+        {%- endfor -%}
+        {%- set r_pair_raw = ns.found_ratio -%}
+    {%- endif -%}
+    {%- if r_pair_raw -%}
+        {%- set r_pair_norm = (r_pair_raw | string).replace("/", ",").replace("-", ",").replace(":", ",") -%}
+        {%- if "," in r_pair_norm -%}
+            {%- set r_pair_parts = r_pair_norm.split(",") -%}
+            {%- set r_pp_pair = (r_pair_parts[0] | trim | float) if (r_pair_parts | length > 0 and (r_pair_parts[0] | trim)) else 0 -%}
+            {%- set r_fl_pair = (r_pair_parts[1] | trim | float) if (r_pair_parts | length > 1 and (r_pair_parts[1] | trim)) else 0 -%}
+            {%- set r_pp = r_pp_pair if r_pp_pair else r_pp -%}
+            {%- set r_fl = r_fl_pair if r_fl_pair else r_fl -%}
+        {%- endif -%}
+    {%- endif -%}
+    {%- set has_saved_ratio = (r_pair_raw or r_pp or r_fl or r_dana or r_ppa or r_anti) -%}
+    {%- set has_saved_mb = r_mb -%}
+    {%- set default_selected = {
+        'pp': (q_master.pp_kgs if q_master else 0.0) | float,
+        'dana': 0.0,
+        'filler': (q_master.filler_kgs if q_master else 0.0) | float,
+        'ppa': (q_master.ppa_kgs if q_master else 0.0) | float,
+        'anti': (q_master.antistatic_kgs if q_master else 0.0) | float
+    } -%}
+
+    {%- set bom_id = doc.po_items[0].bom_no if (doc.po_items and doc.po_items[0].bom_no) else None -%}
+    {%- set first_bom = frappe.get_doc("BOM", bom_id) if bom_id else None -%}
+
+    {%- if first_bom -%}
+    {%- set selected = {'pp': 0.0, 'dana': 0.0, 'filler': 0.0, 'ppa': 0.0, 'anti': 0.0} -%}
+    {%- set bom_norm = {'pp': 0.0, 'dana': 0.0, 'filler': 0.0, 'ppa': 0.0, 'anti': 0.0, 'mb': 0.0} -%}
+    {%- set matched_bom_codes = [] -%}
+
+    {%- set batch_size = first_bom.quantity if first_bom.quantity > 1 else ((q_master.pp_kgs or 0) + (q_master.filler_kgs or 0)) -%}
+    {%- set batch_size = batch_size | float if batch_size > 0 else 100.0 -%}
+
+    {%- for row in first_bom.items -%}
+    {%- set iname_raw = row.item_name or row.item_code -%}
+    {%- set iname = iname_raw | lower -%}
+    {%- set ic = row.item_code.upper() -%}
+    {%- set qty = (row.qty * batch_size) if first_bom.quantity <= 1 else row.qty -%}
+
+    {%- if "ppa" in iname or "vista" in iname or "slip" in iname or "aid" in iname -%}
+    {%- if selected.update({'ppa': selected.ppa + qty}) -%}{%- endif -%}
+    {%- if bom_norm.update({'ppa': bom_norm.ppa + (row.qty | float)}) -%}{%- endif -%}
+    {%- if matched_bom_codes.append(row.item_code) -%}{%- endif -%}
+    {%- elif "anti" in iname or "static" in iname -%}
+    {%- if selected.update({'anti': selected.anti + qty}) -%}{%- endif -%}
+    {%- if bom_norm.update({'anti': bom_norm.anti + (row.qty | float)}) -%}{%- endif -%}
+    {%- if matched_bom_codes.append(row.item_code) -%}{%- endif -%}
+    {%- elif "pp" in iname or "poly" in iname or "hp" in iname or "basell" in iname or "rep" in iname or
+    ic.startswith("1002") -%}
+    {%- if selected.update({'pp': selected.pp + qty}) -%}{%- endif -%}
+    {%- if bom_norm.update({'pp': bom_norm.pp + (row.qty | float)}) -%}{%- endif -%}
+    {%- if matched_bom_codes.append(row.item_code) -%}{%- endif -%}
+    {%- elif "dana" in iname -%}
+    {%- if selected.update({'dana': selected.dana + qty}) -%}{%- endif -%}
+    {%- if bom_norm.update({'dana': bom_norm.dana + (row.qty | float)}) -%}{%- endif -%}
+    {%- if matched_bom_codes.append(row.item_code) -%}{%- endif -%}
+    {%- elif "filler" in iname or "fl " in iname or "fl-" in iname or "fill" in iname or "calcium" in iname or "carb" in
+    iname or "talc" in iname or "sw9" in iname or ic.startswith("1003") -%}
+    {%- if selected.update({'filler': selected.filler + qty}) -%}{%- endif -%}
+    {%- if bom_norm.update({'filler': bom_norm.filler + (row.qty | float)}) -%}{%- endif -%}
+    {%- if matched_bom_codes.append(row.item_code) -%}{%- endif -%}
+    {%- endif -%}
+    {%- endfor -%}
+
+    {# One Mixing Ratio rule:
+       - default from Quality Master
+       - if popup has changed values, use popup values only for provided fields #}
+    {%- set selected = default_selected -%}
+    {%- if has_saved_ratio -%}
+        {%- set selected = {
+            'pp': r_pp | float if r_pp else selected.pp,
+            'dana': r_dana | float if r_dana else selected.dana,
+            'filler': r_fl | float if r_fl else selected.filler,
+            'ppa': r_ppa | float if r_ppa else selected.ppa,
+            'anti': r_anti | float if r_anti else selected.anti
+        } -%}
+    {%- else -%}
+        {# If popup values are not persisted, use BOM proportions on QM base (stable, non-inflated). #}
+        {%- set bom_base_norm = (bom_norm.pp + bom_norm.dana + bom_norm.filler) | float -%}
+        {%- set qm_base_total = (default_selected.pp + default_selected.filler) | float -%}
+        {%- if bom_base_norm > 0 and qm_base_total > 0 -%}
+            {%- set selected = {
+                'pp': (bom_norm.pp / bom_base_norm) * qm_base_total,
+                'dana': (bom_norm.dana / bom_base_norm) * qm_base_total,
+                'filler': (bom_norm.filler / bom_base_norm) * qm_base_total,
+                'ppa': (bom_norm.ppa / bom_base_norm) * qm_base_total,
+                'anti': (bom_norm.anti / bom_base_norm) * qm_base_total
+            } -%}
+        {%- endif -%}
+    {%- endif -%}
+
+    {%- set first_bom_mb_qty_dict = {'val': 0.0} -%}
+    {%- for row in first_bom.items -%}
+    {%- if row.item_code not in matched_bom_codes -%}
+    {%- set mb_scaled_qty = (row.qty * batch_size) if first_bom.quantity <= 1 else row.qty -%}
+    {%- if first_bom_mb_qty_dict.update({'val': first_bom_mb_qty_dict.val + mb_scaled_qty}) -%}{%- endif -%}
+    {%- endif -%}
+    {%- endfor -%}
+    {%- set first_bom_mb_qty = first_bom_mb_qty_dict.val -%}
+    {%- if not has_saved_mb and (first_bom.get("custom_ldr_") or first_bom.get("custom_ldr")) and (selected.pp + selected.dana + selected.filler) > 0 -%}
+        {%- set first_bom_mb_qty = ((selected.pp + selected.dana + selected.filler) * ((first_bom.get("custom_ldr_") or first_bom.get("custom_ldr") or 0) | float) / 100.0) -%}
+    {%- endif -%}
+    {%- else -%}
+    {%- set selected = default_selected -%}
+    {%- set first_bom_mb_qty = 0.0 -%}
+    {%- endif -%}
+
+    {# 1. FETCH LDR WEIGHTED AVERAGE FROM COLOUR MASTER #}
+    {%- set total_planned_weight_for_ldr = 0 -%}
+    {%- set total_weighted_ldr = 0 -%}
+    {%- set fetched_ldr = 0 -%}
+
+    {%- for row in doc.po_items -%}
+    {%- if row.custom_color -%}
+    {%- set ldr = frappe.db.get_value("Colour Master", row.custom_color, "masterbatch_ldr_") or
+    frappe.db.get_value("Colour Master", {"colour_name": row.custom_color}, "masterbatch_ldr_") or 0 -%}
+    {%- if ldr > 0 -%}
+    {%- set weight = row.planned_qty | float -%}
+    {%- set total_planned_weight_for_ldr = total_planned_weight_for_ldr + weight -%}
+    {%- set total_weighted_ldr = total_weighted_ldr + (ldr * weight) -%}
+    {%- endif -%}
+    {%- endif -%}
+    {%- endfor -%}
+
+    {%- if total_planned_weight_for_ldr > 0 -%}
+    {%- set fetched_ldr = total_weighted_ldr / total_planned_weight_for_ldr -%}
+    {%- endif -%}
+
+    {# Fallback to BOM if LDR still 0 (avoid SQL on non-existent custom columns) #}
+    {%- if not fetched_ldr and first_bom -%}
+        {%- set fetched_ldr = first_bom.get("custom_ldr_") or first_bom.get("custom_ldr") or 0 -%}
+    {%- endif -%}
+
+    {# Fallback Name for MB if still empty #}
+    {%- set final_mb_name = item_names.mb | join(" : ") if item_names.mb else (doc.get("mb_item") or
+    doc.get("custom_mb_item") or "Standard") -%}
+
+    {# Pre-calculate MB Mixing Value so it can be reused in totals #}
+    {%- if has_saved_mb and r_mb -%}
+        {%- set mb_mix_val = r_mb | float -%}
+    {%- elif first_bom -%}
+        {%- set mb_mix_val = first_bom_mb_qty -%}
+        {%- if fetched_ldr <= 0 and (selected.pp + selected.dana + selected.filler)> 0 -%}
+            {%- set fetched_ldr = (mb_mix_val / (selected.pp + selected.dana + selected.filler) * 100) | round(2) -%}
+        {%- endif -%}
+    {%- else -%}
+        {%- set mb_mix_val = (selected.pp + selected.dana + selected.filler) * fetched_ldr / 100 if selected.pp else 0 -%}
+    {%- endif -%}
+
+        {%- set final_names = {
+        'pp': item_names.pp | join(" : "),
+        'dana': item_names.dana | join(" : "),
+        'filler': item_names.filler | join(" : "),
+        'ppa': item_names.ppa | join(" : "),
+        'anti': item_names.anti | join(" : ")
+        } -%}
+
+        <table class="table table-bordered table-condensed">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="width: 8%;">S.No</th>
+                    <th>Material</th>
+                    <th style="width: 18%;">Half Mixing Ratio (Kgs)</th>
+                    <th style="width: 18%;">One Mixing Ratio (Kgs)</th>
+                    <th style="width: 22%;">Total Required Qty (Kgs)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {# ROW 1: PP #}
+                {% set total_pp_qty_from_bom = item_qtys.pp %}
+                {% if total_pp_qty_from_bom > 0 and pp_item_dict | length > 0 %}
+                {% for pp_name, pp_qty in pp_item_dict.items() %}
+                {% set proportion = (pp_qty / total_pp_qty_from_bom) %}
+                {% set this_pp_selected = selected.pp * proportion %}
+                <tr>
+                    {% if loop.index == 1 %}
+                    <td rowspan="{{ pp_item_dict | length }}">1</td>
+                    {% endif %}
+                    <td>
+                        PP : <span style="color: #17a2b8; font-weight: bold;">{{ pp_name }}</span>
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(this_pp_selected / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(this_pp_selected) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(pp_qty) }}</b></td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td>1</td>
+                    <td>
+                        PP
+                        {% if final_names.pp %} : <span style="color: #17a2b8; font-weight: bold;">{{ final_names.pp
+                            }}</span>{% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.pp / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.pp) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(item_qtys.pp) }}</b></td>
+                </tr>
+                {% endif %}
+
+                {# ROW 2: DANA #}
+                {% set has_dana = (selected.dana > 0 or item_qtys.dana > 0 or final_names.dana) %}
+                {% if has_dana %}
+                <tr>
+                    <td>2</td>
+                    <td>
+                        Dana
+                        {% if final_names.dana %} : <span style="color: #17a2b8; font-weight: bold;">{{
+                            final_names.dana
+                            }}</span>{% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.dana / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.dana) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(item_qtys.dana) }}</b></td>
+                </tr>
+                {% endif %}
+
+                {# ROW 3: FILLER #}
+                {% set has_filler = (selected.filler > 0 or item_qtys.filler > 0 or final_names.filler) %}
+                {% if has_filler %}
+                <tr>
+                    <td>{{ 3 if has_dana else 2 }}</td>
+                    <td>
+                        Filler
+                        {% if final_names.filler %} : <span style="color: #17a2b8; font-weight: bold;">{{
+                            final_names.filler
+                            }}</span>{% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.filler / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.filler) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(item_qtys.filler) }}</b></td>
+                </tr>
+                {% endif %}
+
+                {# ROW 4: PPA #}
+                {% set sno_ppa = 1 + (1 if has_dana else 0) + (1 if has_filler else 0) + 1 %}
+                <tr>
+                    <td>{{ sno_ppa }}</td>
+                    <td>
+                        PPA
+                        {% if final_names.ppa %} : <span style="color: #17a2b8; font-weight: bold;">{{ final_names.ppa
+                            }}</span>{% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.ppa / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.ppa) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(item_qtys.ppa) }}</b></td>
+                </tr>
+
+                {# ROW 5: ANTISTATIC #}
+                <tr>
+                    <td>{{ sno_ppa + 1 }}</td>
+                    <td>
+                        Antistatic
+                        {% if final_names.anti %} : <span style="color: #17a2b8; font-weight: bold;">{{ final_names.anti
+                            }}</span>{% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.anti / 2) }}</td>
+                    <td style="text-align: center;">{{ "%.1f" | format(selected.anti) }}</td>
+                    <td style="text-align: center;"><b>{{ "%.2f" | format(item_qtys.anti) }}</b></td>
+                </tr>
+
+                {# ROW 6: MASTERBATCH #}
+                <tr style="background-color: #fff9c4;">
+                    <td>{{ sno_ppa + 2 }}</td>
+                    <td>
+                        <strong>Color MB
+                            {% if fetched_ldr > 0 %}<span style="color: #666; font-weight: normal;">({{ fetched_ldr
+                                }}%)</span>{% endif %}
+                            {% if final_mb_name != "Standard" %} : <span style="color: #d39e00;">{{ final_mb_name
+                                }}</span>{% else %} : {{ final_mb_name }}{% endif %}
+                        </strong>
+                    </td>
+                    <td style="text-align: center;">
+                        <strong>{{ "%.1f" | format(mb_mix_val / 2) }}</strong>
+                    </td>
+                    <td style="text-align: center;">
+                        <strong>{{ "%.1f" | format(mb_mix_val) }}</strong>
+                    </td>
+
+                    <td style="text-align: center;"><strong>{{ "%.2f" | format(item_qtys.mb) }}</strong></td>
+                </tr>
+
+                {# ===== TOTALS ROW ===== #}
+                {%- set total_one_mixing = selected.pp + selected.dana + selected.filler + selected.ppa + selected.anti + (mb_mix_val |
+                round(2)) -%}
+                {%- set total_req_qty = (item_qtys.pp | round(2)) + (item_qtys.dana | round(2)) + (item_qtys.filler | round(2)) + (item_qtys.ppa |
+                round(2)) + (item_qtys.anti | round(2)) + (item_qtys.mb | round(2)) -%}
+
+                <tr style="background-color: #d4edda; font-weight: bold;">
+                    <td colspan="2" style="text-align: center;"><strong>TOTAL</strong></td>
+                    <td style="text-align: center;"><strong>{{ "%.1f" | format(total_one_mixing / 2) }}</strong></td>
+                    <td style="text-align: center;"><strong>{{ "%.1f" | format(total_one_mixing) }}</strong></td>
+                    <td style="text-align: center;"><strong>{{ "%.2f" | format(total_req_qty) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        {# ===== NO OF MIXING FIELD ===== #}
+        {%- set raw_half_mixing = (total_req_qty / (total_one_mixing / 2)) | round(0, 'floor') | int if total_one_mixing > 0 else 0 -%}
+        {%- set no_of_half_mixing = (raw_half_mixing - 2) if raw_half_mixing >= 2 else 0 -%}
+        {%- set raw_one_mixing = (total_req_qty / total_one_mixing) | round(0, 'floor') | int if total_one_mixing > 0 else 0 -%}
+        {%- set no_of_one_mixing = (raw_one_mixing - 1) if raw_one_mixing >= 1 else 0 -%}
+
+        <div style="margin-top: 10px;">
+
+            <div
+                style="padding: 10px 20px; background-color: #fce4ec; border: 2px solid #e91e63; border-radius: 6px; display: inline-block;">
+                <span style="font-size: 13px; color: #333;"><strong>No of Half mixing:</strong></span>
+                <span style="font-size: 20px; color: #e91e63; font-weight: bold; margin-left: 10px;">{{
+                    no_of_half_mixing
+                    }}</span>
+            </div>
+            <div
+                style="padding: 10px 20px; background-color: #e9f7f9; border: 2px solid #17a2b8; border-radius: 6px; display: inline-block; margin-right: 15px;">
+                <span style="font-size: 13px; color: #333;"><strong>No of One mixing:</strong></span>
+                <span style="font-size: 20px; color: #17a2b8; font-weight: bold; margin-left: 10px;">{{ no_of_one_mixing
+                    }}</span>
+            </div>
+            <div style="margin-top: 15px;">
+                <span style="font-size: 14px; color: #d9534f; font-weight: bold; background-color: #fff9c4; padding: 6px 12px; border-radius: 4px; border: 1px solid #f0e68c; display: inline-block;">
+                    * Extra mixing can be done based on production needs
+                </span>
+            </div>
+        </div>
+</div>
+{%- endif -%}
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Shaft Details</h4>
+    <table class="table table-bordered table-condensed">
+        <thead>
+            <tr>
+                <th style="width: 5%;">Job</th>
+                <th style="width: 5%;">GSM</th>
+                <th style="width: 15%;">Combination (Inches)</th>
+                <th style="width: 10%;">Total Width (Inches)</th>
+                <th style="width: 8%;">Length (Mtrs)</th>
+                <th style="width: 5%;">No of Shafts</th>
+                <th style="width: 15;">Net Weight / Shaft (Kgs)</th>
+                <th style="width: 8%;">Total Weight (Kgs)</th>
+
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in doc.custom_shaft_details %}
+            <tr>
+                <td style="text-align: center;">{{ row.s_no }}</td>
+                <td style="text-align: center;">{{ row.gsm }}</td>
+                <td style="text-align: center;">{{ row.combination }}</td>
+                <td style="text-align: center;">{{ row.combined_width }}</td>
+                <td style="text-align: center;">{{ row.meter__roll }}</td>
+                <td style="text-align: center;">{{ row.no_of_shaft }}</td>
+                <td style="text-align: center;">{{ row.net_weight }}</td>
+                <td style="text-align: center;">{{ row.total_weight_kgs }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Finished Goods</h4>
+    <table class="table table-bordered table-condensed">
+        <thead>
+            <tr>
+                <th>S.No</th>
+                <th>Color</th>
+                <th>GSM</th>
+                <th>Width (Inches)</th>
+                <th>Planned Qty (Kgs)</th>
+                <th>UOM</th>
+                <th>Length (Mtrs)</th>
+                <th>No of Rolls</th>
+                <th>Weight / Roll (Kgs)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in doc.po_items %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td style="text-align: center;">{{ row.custom_color or "" }}</td>
+                <td style="text-align: center;">{{ row.custom_gsm or "" }}</td>
+                <td style="text-align: center;">{{ row.custom_width_ or "" }}</td>
+                <td style="text-align: center;">{{ row.get_formatted("planned_qty") }}</td>
+                <td style="text-align: center;">{{ row.stock_uom or row.uom }}</td>
+                <td style="text-align: center;">{{ row.custom_meterperroll or "" }}</td>
+                <td style="text-align: center;">
+                    {% if row.custom_no_of_rolls %}
+                    <b>{{ row.custom_no_of_rolls }}</b>
+                    {% elif row.custom_no_of_rolls_ %}
+                    <b>{{ row.custom_no_of_rolls_ }}</b>
+                    {% elif row.custom_gsm and row.custom_width_ and row.custom_meterperroll and row.planned_qty %}
+                    {% set g_weight = (row.custom_gsm | float * row.custom_width_ | float * row.custom_meterperroll |
+                    float * 0.0254 / 1000) %}
+                    <b>{{ (row.planned_qty | float / g_weight) | round(0, 'ceil') | int }}</b>
+                    {% else %}
+                    0
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">
+                    {% if row.custom_weight_per_roll %}
+                    <b>{{ "%.3f" | format(row.custom_weight_per_roll | float) }}</b>
+                    {% elif row.custom_gsm and row.custom_width_ and row.custom_meterperroll %}
+                    {% set g_weight = (row.custom_gsm | float * row.custom_width_ | float * row.custom_meterperroll |
+                    float * 0.0254 / 1000) %}
+                    <b>{{ "%.3f" | format(g_weight) }}</b>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+
+<style>
+    .section-title {
+        background-color: #f8f9fa;
+        padding: 8px;
+        font-weight: bold;
+        border-left: 4px solid #17a2b8;
+        margin-bottom: 10px;
+        font-size: 14px;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .table td,
+    .table th {
+        vertical-align: middle !important;
+        font-size: 11px;
+        border: 1px solid #d1d1d1 !important;
+    }
+
+    th {
+        background-color: #f2f2f2 !important;
+        font-weight: bold;
+        text-align: center !important;
+    }
+
+    .spec-table th {
+        text-align: left !important;
+        background-color: #f9f9f9 !important;
+    }
+
+    .spec-table td {
+        text-align: left !important;
+        padding-left: 10px !important;
+    }
+</style>

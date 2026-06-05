@@ -1,0 +1,361 @@
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th,
+    td {
+        padding: 4px;
+    }
+
+    .border th,
+    .border td {
+        border: 1px solid #000;
+    }
+
+    .header-box {
+        border: 1px solid #000;
+        padding: 10px;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .mt-10 {
+        margin-top: 10px;
+    }
+
+    .mt-20 {
+        margin-top: 20px;
+    }
+
+    .address-container {
+        line-height: 1.3;
+    }
+
+    .outside-label {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    .keep-together {
+        page-break-inside: avoid;
+    }
+
+    tr {
+        page-break-inside: auto;
+        page-break-after: auto;
+    }
+
+    tbody {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tfoot {
+        display: table-footer-group;
+    }
+
+    .company-logo {
+        max-width: 280px;
+        max-height: 120px;
+        width: auto;
+        height: auto;
+    }
+
+    /* Table Styles */
+    .item-header-row td {
+        background-color: #e6e6e6;
+        font-weight: bold;
+        border-top: 2px solid #000;
+        padding: 8px 4px;
+    }
+
+    .batch-table th {
+        background-color: #f2f2f2;
+        font-size: 10px;
+        text-align: center;
+    }
+
+    .batch-table td {
+        text-align: center;
+        font-size: 10px;
+    }
+</style>
+
+{%- set billing_addr = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None -%}
+{%- set shipping_addr = frappe.get_doc("Address", doc.shipping_address_name) if doc.shipping_address_name else
+billing_addr -%}
+
+<table width="100%" style="border: none;">
+    <tr>
+        <td style="border: none; padding: 0;">
+            <div class="outside-label">{{ "PACKING LIST" | upper }}</div>
+            <div class="header-box">
+                    <table width="100%" style="border: none;">
+                        <tr>
+                            <td width="60%" valign="top" style="border: none;">
+
+
+                                <div class="bold" style="font-size:18px; margin-top:6px; text-transform: uppercase;">
+                                    JAYASHREE SPUN BOND</div>
+                                <div class="address-container" style="margin-top:6px;">
+                                    <b>Regd : </b> 42, Old Kuyavarpalayam Road , Madurai - 625009.<br>
+                                    <b> Factory Address : </b> 3/4A, Nedungulam Main road,<br>
+                                    Pottapalayam, Tamil Nadu India - 630611.<br>
+                                    <b>GSTIN :</b> 33AAIFJ4747P1ZT<br>
+                                    <b>Email Id:</b> info@jayashreespunbond.com<br>
+                                    <b>Phone No:</b> +91 9789578884<br>
+                                    <b>State Name:</b> Tamil Nadu <b>Code:</b> 33
+                                </div>
+
+                            </td>
+                            <td width="40%" valign="top" class="text-right" style="border: none;">
+                                {% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") %}
+                                {% if company_logo %}<img src="{{ company_logo }}" class="company-logo"><br>{% endif %}
+                                <div style="line-height: 1.4; margin-top: 5px;">
+                                    <b>Packing List No :</b> {{ doc.name }}<br>
+                                    <b>Date :</b> {{ doc.posting_date }}<br>
+                                    <b>SO No :</b>
+                                    {% set sales_orders = [] %}
+                                    {% for item in doc.items %}
+                                    {% if item.against_sales_order and item.against_sales_order not in sales_orders %}
+                                    {% set _ = sales_orders.append(item.against_sales_order) %}
+                                    {% endif %}
+                                    {% endfor %}
+                                    {{ sales_orders | join(', ') }}<br>
+                                    {{ so_series_list | join(', ') }}
+                                    <b>Customer :</b> {{ doc.customer }}<br>
+
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td style="border: none; padding: 0;">
+                {# Group items by (item_code + item_name) so repeated lines become a single box #}
+                {% set group_keys = [] %}
+                {% set groups = namespace(map={}) %}
+
+                {% for it in doc.items %}
+                {% set key = (it.item_code or "") ~ "||" ~ (it.item_name or "") %}
+                {% if key not in group_keys %}
+                {% set _ = group_keys.append(key) %}
+                {% set _ = groups.map.update({key: []}) %}
+                {% endif %}
+                {% set _ = groups.map[key].append(it) %}
+                {% endfor %}
+
+                {% for key in group_keys %}
+                {% set lines = groups.map[key] %}
+                {% set display_item = lines[0] %}
+                {% set merged_qty = namespace(value=0) %}
+                {% set batches = [] %}
+                {% set cbm_map = {} %}
+
+                {% for item in lines %}
+                {% set merged_qty.value = merged_qty.value + (item.qty | float) %}
+
+                {# --- LOGIC TO FIND BATCHES + CBM MAP (per line, merged) --- #}
+                {% set line_batches = [] %}
+
+                {# 1. Check custom scanner script data #}
+                {% if item.custom_scanned_rolls_data %}
+                {% set parsed_rolls = frappe.utils.parse_json(item.custom_scanned_rolls_data) %}
+                {% if parsed_rolls %}
+                {% for roll in parsed_rolls %}
+                {% if roll.batch_no and roll.batch_no not in line_batches %}
+                {% set _ = line_batches.append(roll.batch_no) %}
+                {% endif %}
+                {% if roll.batch_no %}
+                {% set _ = cbm_map.update({roll.batch_no: (roll.cbm | default(0) | float)}) %}
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+                {% endif %}
+
+                {% if not line_batches %}
+                {# 2. Check if Batch is directly on the line #}
+                {% if item.batch_no %}
+                {% set _ = line_batches.append(item.batch_no) %}
+
+                {# 3. Check if Batch is in a Serial/Batch Bundle (Newer ERPNext versions) #}
+                {% elif item.serial_and_batch_bundle %}
+                {% set bundle_entries = frappe.get_all("Serial and Batch Bundle Entry",
+                filters={"parent": item.serial_and_batch_bundle},
+                fields=["batch_no"]) %}
+                {% for entry in bundle_entries %}
+                {% if entry.batch_no %}
+                {% set _ = line_batches.append(entry.batch_no) %}
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+                {% endif %}
+
+                {% for b in line_batches %}
+                {% if b and b not in batches %}
+                {% set _ = batches.append(b) %}
+                {% endif %}
+                {% endfor %}
+                {% endfor %}
+
+                <div style="page-break-inside: avoid; break-inside: avoid; margin-top: 15px;">
+                    <table class="border" width="100%">
+                        <tbody>
+                            <tr class="item-header-row">
+                                <td colspan="6">
+                                    <span style="font-size: 12px;">{{ loop.index }}. {{ display_item.item_code }} - {{
+                                        display_item.item_name }}</span>
+                                    <span style="float: right;">Quantity: {{ "{:,.2f}".format(merged_qty.value) }} Kgs</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td colspan="6" style="padding: 0;">
+                                    <table width="100%" class="batch-table" style="border: none;">
+                                        <thead>
+                                            <tr>
+                                                <th width="7%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">S
+                                                    No</th>
+                                                <th width="16%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">
+                                                    Batch No / Roll No</th>
+                                                <th width="11%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">
+                                                    Order Code</th>
+                                                <th width="12%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">
+                                                    Length (Mtrs)</th>
+                                                <th width="20%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">
+                                                    Gross Weight (Kgs)</th>
+                                                <th width="20%"
+                                                    style="border-right: 1px solid #ddd; border-bottom: 1px solid #000;">Net Weight (Kgs)</th>
+                                                <th width="14%" style="border-bottom: 1px solid #000;">CBM</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% if batches|length > 0 %}
+                                            {% set total_rolls = namespace(value=0) %}
+                                            {% set total_meter = namespace(value=0) %}
+                                            {% set total_gross = namespace(value=0) %}
+                                            {% set total_net = namespace(value=0) %}
+                                            {% set total_cbm = namespace(value=0) %}
+                                            {% set roll_no = namespace(value=0) %}
+
+                                            {% for batch_id in batches %}
+                                            {% set batch_doc = frappe.get_doc("Batch", batch_id) %}
+                                            {% set roll_no.value = roll_no.value + 1 %}
+                                            {% set total_rolls.value = total_rolls.value + 1 %}
+                                            {% set total_meter.value = total_meter.value + (batch_doc.custom_meter | string
+                                            | replace(",","") | float) %}
+                                            {% set total_gross.value = total_gross.value + (batch_doc.custom_gross_weight |
+                                            string | replace(",","") | float) %}
+                                            {% set total_net.value = total_net.value + (batch_doc.custom_net_weight | float)
+                                            %}
+                                            {% set total_cbm.value = total_cbm.value + cbm_map.get(batch_id, 0) %}
+                                            <tr>
+
+                                                <td style="border-right: 1px solid #ddd;">{{ roll_no.value }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ batch_id }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{
+                                                    batch_doc.custom_party_code_text or "-" }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(batch_doc.custom_meter | float) if batch_doc.custom_meter else "-" }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(batch_doc.custom_gross_weight | float) if batch_doc.custom_gross_weight else "-" }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(batch_doc.custom_net_weight | float) if batch_doc.custom_net_weight else "-" }}</td>
+                                                <td>{{ "{:,.2f}".format(cbm_map.get(batch_id, 0)) if cbm_map.get(batch_id) else "-" }}</td>
+                                            </tr>
+                                            {% endfor %}
+
+                                            <!-- Subtotal Row -->
+                                            <tr
+                                                style="border-top: 1px solid #000; font-weight: bold; background-color: #f5f5f5;">
+                                                <td style="border-right: 1px solid #ddd;" colspan="3">Total</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(total_meter.value) }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(total_gross.value) }}</td>
+                                                <td style="border-right: 1px solid #ddd;">{{ "{:,.2f}".format(total_net.value) }}</td>
+                                                <td>{{ "{:,.2f}".format(total_cbm.value) }}</td>
+                                            </tr>
+
+                                            {% else %}
+                                            <tr>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td style="border-right: 1px solid #ddd;">-</td>
+                                                <td>-</td>
+                                            </tr>
+                                            {% endif %}
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% endfor %}
+
+                <table width="100%" class="mt-20">
+                    <tr>
+                        <td width="60%" valign="top">
+                        </td>
+                        <td width="40%" valign="top" style="padding-left: 10px;">
+                            <table class="border" width="100%">
+                                <tr class="bold" style="background:#f2f2f2;">
+                                    <td>Total Quantity</td>
+                                    <td class="text-right">{{ "{:,.2f}".format(doc.total_qty | float) }} Kgs </td>
+
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <table width="100%" style="margin-top:40px;" class="keep-together">
+                    <tr>
+                        <td width="33%" align="center" valign="bottom"><b>Delivered By</b><br>{{
+                            frappe.get_fullname(doc.owner) }}</td>
+                        <td width="33%" align="center" valign="bottom"><b>Verified By</b><br>{{
+                            frappe.get_fullname(doc.custom_checked_by or "") }}</td>
+                        <td width="33%" align="right">
+                            for JAYASHREE SPUN BOND
+                            <img src=" "
+                                style="height:60px; width:150px; display:block; margin-left:auto; margin-right:0; object-fit:contain; object-position:right;">
+                            <b>Authorised Signatory</b>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+</table>
+
+<div style="text-align: center; font-weight: bold; margin-top: 30px;">
+    SUBJECT TO MADURAI JURISDICTION<br>
+    This is a Computer Generated Delivery Note
+</div>

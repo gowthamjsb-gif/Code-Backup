@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Label Fields Reference</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .page-title h1 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #6ee7f7, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .page-title p {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin-top: 6px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            margin-top: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e2130;
+            min-width: 900px;
+        }
+
+        thead tr {
+            background: linear-gradient(135deg, #1a1f35, #252b42);
+        }
+
+        thead th {
+            padding: 18px 22px;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #2d3553;
+            white-space: nowrap;
+        }
+
+        thead th:first-child {
+            text-align: left;
+            color: #94a3b8;
+        }
+
+        .col-default {
+            color: #38bdf8;
+        }
+
+        .col-plain {
+            color: #34d399;
+        }
+
+        .col-plaincc {
+            color: #a78bfa;
+        }
+
+        .col-reliance {
+            color: #fb923c;
+        }
+
+        .col-perfect {
+            color: #f472b6;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #252b42;
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover {
+            background: #252b42;
+        }
+
+        tbody tr.section-header td {
+            background: #1a1f35;
+            color: #6ee7f7;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 10px 22px;
+            border-bottom: 1px solid #2d3553;
+        }
+
+        tbody td {
+            padding: 14px 22px;
+            font-size: 0.92rem;
+            vertical-align: middle;
+        }
+
+        tbody td:first-child {
+            font-weight: 700;
+            color: #cbd5e1;
+            white-space: nowrap;
+        }
+
+        tbody td:not(:first-child) {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.88rem;
+        }
+
+        .tick {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: rgba(52, 211, 153, 0.15);
+            border: 1.5px solid #34d399;
+            border-radius: 50%;
+            color: #34d399;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .cross {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: rgba(248, 113, 113, 0.1);
+            border: 1.5px solid #f87171;
+            border-radius: 50%;
+            color: #f87171;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-blue {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .badge-green {
+            background: rgba(52, 211, 153, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .badge-purple {
+            background: rgba(167, 139, 250, 0.12);
+            color: #a78bfa;
+            border: 1px solid rgba(167, 139, 250, 0.3);
+        }
+
+        .badge-orange {
+            background: rgba(251, 146, 60, 0.12);
+            color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+
+        .badge-pink {
+            background: rgba(244, 114, 182, 0.12);
+            color: #f472b6;
+            border: 1px solid rgba(244, 114, 182, 0.3);
+        }
+
+        .badge-gray {
+            background: rgba(148, 163, 184, 0.10);
+            color: #64748b;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: #64748b;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="page-title">
+        <h1>🏷️ Label Fields Reference</h1>
+        <p>All visible fields across every label type — JayaShree Spun Bond</p>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th class="col-default">Default</th>
+                    <th class="col-plain">Plain</th>
+                    <th class="col-plaincc">Plain CC</th>
+                    <th class="col-reliance">Reliance</th>
+                    <th class="col-perfect">Perfect</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                <!-- HEADER SECTION -->
+                <tr class="section-header">
+                    <td colspan="6">Header Area</td>
+                </tr>
+
+                <tr>
+                    <td>Header (Top Line)</td>
+                    <td><span class="badge badge-blue">JayaShree Spun Bond</span></td>
+                    <td><span class="badge badge-green">Non Woven Fabrics</span></td>
+                    <td><span class="badge badge-purple">Non Woven Fabrics</span></td>
+                    <td><span class="badge badge-orange">Non Woven Fabrics</span></td>
+                    <td><span class="badge badge-pink">Non Woven Fabrics</span></td>
+                </tr>
+                <tr>
+                    <td>Sub-header 1</td>
+                    <td><span class="badge badge-blue">Email</span></td>
+                    <td><span class="badge badge-green">Quality</span></td>
+                    <td><span class="badge badge-purple">Quality + Order Code</span></td>
+                    <td><span class="badge badge-orange">Quality</span></td>
+                    <td><span class="badge badge-pink">Quality</span></td>
+                </tr>
+                <tr>
+                    <td>Sub-header 2</td>
+                    <td><span class="badge badge-blue">Quality + Order Code</span></td>
+                    <td><span class="badge badge-gray">None</span></td>
+                    <td><span class="badge badge-gray">None</span></td>
+                    <td><span class="badge badge-gray">None</span></td>
+                    <td><span class="badge badge-gray">None</span></td>
+                </tr>
+
+                <!-- DATA SECTION -->
+                <tr class="section-header">
+                    <td colspan="6">Data Fields</td>
+                </tr>
+
+                <tr>
+                    <td>ITEM (Item Code)</td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                    <td>GSM</td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                    <td>COLOR</td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                    <td>Length Label</td>
+                    <td><span class="badge badge-blue">MTR</span></td>
+                    <td><span class="badge badge-green">LENGTH</span></td>
+                    <td><span class="badge badge-purple">MTR</span></td>
+                    <td><span class="badge badge-orange">LENGTH + " MTR"</span></td>
+                    <td><span class="badge badge-pink">LENGTH + " MTR"</span></td>
+                </tr>
+                <tr>
+                    <td>Width / Size Label</td>
+                    <td><span class="badge badge-blue">WIDTH (inch)</span></td>
+                    <td><span class="badge badge-green">WIDTH (inch)</span></td>
+                    <td><span class="badge badge-purple">WIDTH (inch)</span></td>
+                    <td><span class="badge badge-orange">SIZE (cm)</span></td>
+                    <td><span class="cross">✕</span> <small style="color:#64748b">Hidden</small></td>
+                </tr>
+                <tr>
+                    <td>NET WT</td>
+                    <td><span class="badge badge-blue">KGS</span></td>
+                    <td><span class="badge badge-green">KGS</span></td>
+                    <td><span class="badge badge-purple">KGS</span></td>
+                    <td><span class="badge badge-orange">KGs</span></td>
+                    <td><span class="badge badge-pink">KGs</span></td>
+                </tr>
+                <tr>
+                    <td>GROSS WT</td>
+                    <td><span class="badge badge-blue">KGS</span></td>
+                    <td><span class="badge badge-green">KGS</span></td>
+                    <td><span class="badge badge-purple">KGS</span></td>
+                    <td><span class="badge badge-orange">KGs</span></td>
+                    <td><span class="badge badge-pink">KGs</span></td>
+                </tr>
+
+                <!-- FOOTER SECTION -->
+                <tr class="section-header">
+                    <td colspan="6">Barcode & Footer</td>
+                </tr>
+
+                <tr>
+                    <td>Barcode (source)</td>
+                    <td><span class="badge badge-blue">batch_no</span></td>
+                    <td><span class="badge badge-green">batch_no</span></td>
+                    <td><span class="badge badge-purple">batch_no</span></td>
+                    <td><span class="badge badge-orange">batch_no</span></td>
+                    <td><span class="badge badge-pink">batch_no</span></td>
+                </tr>
+                <tr>
+                    <td>BATCH # (footer text)</td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                    <td>ROLL # (footer text)</td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                    <td><span class="tick">✓</span></td>
+                </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-dot" style="background:#38bdf8"></div> Default
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:#34d399"></div> Plain
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:#a78bfa"></div> Plain CC
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:#fb923c"></div> Reliance
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:#f472b6"></div> Perfect
+        </div>
+    </div>
+
+</body>
+
+</html>

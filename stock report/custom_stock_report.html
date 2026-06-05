@@ -1,0 +1,53 @@
+<style>
+    @page { size: A4 portrait; margin: 8mm; }
+    .print-container { width: 100%; font-family: sans-serif; color: #333; }
+    .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; table-layout: fixed; }
+    .report-table th, .report-table td { border: 1px solid #000; padding: 6px 4px; text-align: left; word-wrap: break-word; overflow: hidden; }
+    .report-table th { background-color: #f5f5f5; font-weight: bold; }
+    .header-logo { max-height: 80px; display: block; margin: 0 auto 10px; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    
+    /* Strict Column Widths (Total 100%) */
+    .w-code { width: 16%; }
+    .w-name { width: 32%; }
+    .w-group { width: 14%; }
+    .w-qty { width: 10%; }
+    .w-uom { width: 8%; }
+    .w-warehouse { width: 20%; }
+</style>
+
+<div class="print-container">
+    <img src="/files/image (4).jpg" alt="Logo" class="header-logo">
+    <h3 class="text-center">Inventory Report – Products</h3>
+    <div class="text-center" style="font-size: 10px; margin-top: -10px; margin-bottom: 20px;">
+        Generated on: {%= frappe.datetime.global_date_format(frappe.datetime.nowdate()) %} {%= frappe.datetime.now_time() %}
+    </div>
+
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th class="w-code">Item Code</th>
+                <th class="w-name">Item Name</th>
+                <th class="w-group">Item Group</th>
+                <th class="w-qty text-right">Qty</th>
+                <th class="w-uom">UOM</th>
+                <th class="w-warehouse">Warehouse</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for(var j=0; j<data.length; j++) { 
+                var r = data[j];
+            %}
+                <tr>
+                    <td class="w-code">{%= r.item_code || '' %}</td>
+                    <td class="w-name">{%= r.item_name || '' %}</td>
+                    <td class="w-group">{%= r.item_group || '' %}</td>
+                    <td class="w-qty text-right">{%= Number(r.actual_qty || 0).toFixed(3) %}</td>
+                    <td class="w-uom">{%= r.unit || r.stock_uom || '' %}</td>
+                    <td class="w-warehouse">{%= r.warehouse || '' %}</td>
+                </tr>
+            {% } %}
+        </tbody>
+    </table>
+</div>

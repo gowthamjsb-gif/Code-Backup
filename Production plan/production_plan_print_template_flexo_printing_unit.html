@@ -1,0 +1,358 @@
+<div class="print-header">
+    <div class="row">
+        <div class="col-xs-7" style="text-align: left;">
+            <h2 style="margin-top:0; color: #17a2b8; font-size: 28px;"><b>Flexo Printing Order Sheet</b></h2>
+            <p style="font-size: 14px;"><strong>Unit:</strong> {{ doc.custom_unit or "Flexo Printing unit" }}</p>
+            <p style="font-size: 14px;"><strong>ID:</strong> {{ doc.name }}</p>
+            <p style="font-size: 14px;"><strong>Order Code:</strong> {{ doc.custom_party_code or "" }}</p>
+            <p style="font-size: 14px;"><strong>Progress:</strong> {{ doc.status }}</p>
+        </div>
+    </div>
+</div>
+
+<hr style="border-top: 2px solid #eee; margin-top: 20px;">
+
+{%- set first_row = doc.po_items[0] if doc.po_items else None -%}
+{%- set p_sheet_banner = None -%}
+{%- if doc.custom_planning_sheet and frappe.db.exists("Planning sheet", doc.custom_planning_sheet) -%}
+{%- set p_sheet_banner = frappe.get_doc("Planning sheet", doc.custom_planning_sheet) -%}
+{%- endif -%}
+
+{%- set banner_plan_item = None -%}
+{%- if p_sheet_banner and first_row -%}
+{%- set ns_b = namespace(found=None) -%}
+{%- for p_row in p_sheet_banner.get("planned_items", []) -%}
+{%- if p_row.item_code == first_row.item_code and not ns_b.found -%}
+{%- set ns_b.found = p_row -%}
+{%- endif -%}
+{%- endfor -%}
+{%- set banner_plan_item = ns_b.found -%}
+{%- endif -%}
+
+{# Design code & name: use planning sheet row fields only (no item_code parsing) #}
+{%- set banner_design_code = "" -%}
+{%- set banner_design_name = "" -%}
+{%- if banner_plan_item -%}
+{%- set banner_design_code = banner_plan_item.get("custom_design_code") or banner_plan_item.get("design_code") or "" -%}
+{%- set banner_design_name = banner_plan_item.get("custom_design_name") or banner_plan_item.get("design_name") or "" -%}
+{%- endif -%}
+
+{%- set ns_tq = namespace(total=0.0) -%}
+{%- for row in (doc.po_items or []) -%}
+{%- set ns_tq.total = ns_tq.total + (row.planned_qty | float) -%}
+{%- endfor -%}
+
+<div style="margin: 15px 0 20px 0; border: 3px solid #17a2b8; border-radius: 8px; overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse; background-color: #fff;">
+        <tr>
+            <td
+                style="width: 65%; padding: 14px 20px; border-right: 2px solid #17a2b8; border-bottom: 2px solid #e0e0e0; vertical-align: middle; text-align: center;">
+                <div
+                    style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                    Design Code &amp; Name</div>
+                <div style="font-size: 22px; font-weight: bold; color: #1a1a1a;">
+                    {{ banner_design_code or "—" }}{% if banner_design_name %} <span style="color: #555;">—</span> {{
+                    banner_design_name }}{% endif %}
+                </div>
+            </td>
+            <td
+                style="width: 35%; padding: 14px 20px; border-bottom: 2px solid #e0e0e0; vertical-align: middle; text-align: center; background-color: #e9f7f9;">
+                <div
+                    style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                    Total Planned Qty</div>
+                <div style="font-size: 26px; font-weight: bold; color: #17a2b8;">
+                    {{ "%.2f" | format(ns_tq.total) }} <span style="font-size: 14px; color: #666;">Kg</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Finished Goods</h4>
+
+    {% set p_sheet = None %}
+    {% if doc.custom_planning_sheet and frappe.db.exists("Planning sheet", doc.custom_planning_sheet) %}
+    {% set p_sheet = frappe.get_doc("Planning sheet", doc.custom_planning_sheet) %}
+    {% endif %}
+
+    {%- set first_po = doc.po_items[0] if doc.po_items else None -%}
+    {%- set sheet_quality = doc.custom_quality or (first_po.custom_quality if first_po else "") -%}
+    {%- set sheet_color = (first_po.custom_color if first_po else "") -%}
+
+    {% for row in doc.po_items %}
+    {%- set rolls = 0 -%}
+    {%- if row.custom_no_of_rolls -%}{%- set rolls = row.custom_no_of_rolls | int -%}
+    {%- elif row.custom_no_of_rolls_ -%}{%- set rolls = row.custom_no_of_rolls_ | int -%}
+    {%- elif row.custom_gsm and row.custom_width_ and row.custom_meterperroll and row.planned_qty -%}
+    {%- set g_weight = (row.custom_gsm | float * row.custom_width_ | float * row.custom_meterperroll | float * 0.0254 / 1000) -%}
+    {%- if g_weight > 0 -%}{%- set rolls = (row.planned_qty | float / g_weight) | round(0, 'ceil') | int -%}{%- endif -%}
+    {%- endif -%}
+
+    {% set plan_item = None %}
+    {% if p_sheet %}
+    {% set ns = namespace(found_item=None) %}
+    {% for p_row in p_sheet.get("planned_items", []) %}
+    {% if p_row.item_code == row.item_code and not ns.found_item %}
+    {% set ns.found_item = p_row %}
+    {% endif %}
+    {% endfor %}
+    {% set plan_item = ns.found_item %}
+    {% endif %}
+
+    {%- set row_design_code = "" -%}
+    {%- set row_design_name = "" -%}
+    {%- if plan_item -%}
+    {%- set row_design_code = plan_item.get("custom_design_code") or plan_item.get("design_code") or "" -%}
+    {%- set row_design_name = plan_item.get("custom_design_name") or plan_item.get("design_name") or "" -%}
+    {%- endif -%}
+
+    {%- if plan_item -%}
+    {%- set ps_gsm = (plan_item.get("gsm") or plan_item.get("custom_gsm") or row.custom_gsm or "") -%}
+    {%- set ps_width = (plan_item.get("width_inch") or plan_item.get("custom_width") or row.custom_width_ or "") -%}
+    {%- set mpr = (plan_item.get("meter_per_roll") or plan_item.get("meter") or row.custom_meterperroll or 0) -%}
+    {%- set ps_quality = (plan_item.get("quality") or plan_item.get("custom_quality") or row.custom_quality or sheet_quality or "") -%}
+    {%- set ps_color = (plan_item.get("color") or plan_item.get("custom_color") or row.custom_color or sheet_color or "") -%}
+    {%- else -%}
+    {%- set ps_gsm = row.custom_gsm or "" -%}
+    {%- set ps_width = row.custom_width_ or "" -%}
+    {%- set mpr = row.custom_meterperroll or 0 -%}
+    {%- set ps_quality = row.custom_quality or sheet_quality or "" -%}
+    {%- set ps_color = row.custom_color or sheet_color or "" -%}
+    {%- endif -%}
+    {%- set total_meters = (mpr | float) * (rolls | float) -%}
+
+    <table class="table table-bordered table-condensed"
+        style="border: 2px solid #000; margin-bottom: 25px; border-collapse: collapse; width: 100%;">
+        <tbody>
+            <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center;">
+                <td style="border: 1px solid #000;">Design Code &amp; Name</td>
+                <td style="border: 1px solid #000;">Quality</td>
+                <td style="border: 1px solid #000;">Colour</td>
+                <td style="border: 1px solid #000;">GSM</td>
+                <td style="border: 1px solid #000;">Width</td>
+                <td style="border: 1px solid #000;">Total Meters</td>
+                <td style="border: 1px solid #000;">Meter/Roll</td>
+                <td style="border: 1px solid #000;">No. of Rolls</td>
+                <td style="border: 1px solid #000;">Planned Qty (Kgs)</td>
+            </tr>
+            <tr style="text-align: center;">
+                <td style="border: 1px solid #000; color: #17a2b8; font-weight: bold;">
+                    {{ row_design_code or "—" }}{% if row_design_name %} — {{ row_design_name }}{% endif %}
+                </td>
+                <td style="border: 1px solid #000;">{{ ps_quality }}</td>
+                <td style="border: 1px solid #000;">{{ ps_color }}</td>
+                <td style="border: 1px solid #000;">{{ ps_gsm }}</td>
+                <td style="border: 1px solid #000;">{{ ps_width }}</td>
+                <td style="border: 1px solid #000; font-weight: bold;">{{ "%.2f" | format(total_meters) }}</td>
+                <td style="border: 1px solid #000;">{{ mpr or "—" }}</td>
+                <td style="border: 1px solid #000; font-weight: bold;">{{ rolls }}</td>
+                <td style="border: 1px solid #000; font-weight: bold;">{{ "%.2f" | format(row.planned_qty | float) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endfor %}
+
+</div>
+
+<div class="row" style="margin-top: 20px;">
+    <div class="col-xs-6">
+        <div class="section">
+            <h4 class="section-title">Packaging Details</h4>
+            <table class="table table-bordered table-condensed spec-table">
+                <tbody>
+                    <tr>
+                        <th style="width: 30%;">Label</th>
+                        <td>{{ doc.custom_label or "" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Packing</th>
+                        <td>{{ doc.custom_packing or "" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-xs-6">
+        <div class="section">
+            <h4 class="section-title">Special Instructions</h4>
+            <div
+                style="border: 1px solid #d1d1d1; padding: 12px; min-height: 60px; font-size: 12px; background-color: #ffffff; border-radius: 4px; text-align: left; line-height: 1.5;">
+                {% if doc.custom_special_instructions %}
+                {% for line in doc.custom_special_instructions.split('\n') %}
+                {% if line.strip() %}{{ line.strip() }}<br>{% endif %}
+                {% endfor %}
+                {% else %}
+                No special instructions provided.
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Raw material rows: show section only if at least one mr line is not a finished-good / product item group #}
+{%- set ns_mr = namespace(rows=[]) -%}
+{%- for mr in (doc.mr_items or []) -%}
+{%- set code = mr.item_code -%}
+{%- set ig = (frappe.db.get_value("Item", code, "item_group") if code and frappe.db.exists("Item", code) else None) or "" -%}
+{%- set igl = ig | lower | replace(" ", "") -%}
+{%- set is_finished_like = (
+    igl == "products" or igl == "services" or "finishedgood" in igl or igl.endswith("finishedgoods")
+) -%}
+{%- set is_raw = (code and ig and not is_finished_like) -%}
+{%- if is_raw -%}
+{%- set _ = ns_mr.rows.append(mr) -%}
+{%- endif -%}
+{%- endfor -%}
+
+{%- if ns_mr.rows -%}
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Raw Material Requirements</h4>
+    <table class="table table-bordered table-condensed">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="width: 8%;">S.No</th>
+                <th style="width: 25%;">Item Code</th>
+                <th>Material / Item Name</th>
+                <th style="width: 20%;">Required Qty</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns_rm = namespace(total=0.0) %}
+            {% for row in ns_mr.rows %}
+            {% set qty = (row.required_bom_qty or row.qty or 0.0) | float %}
+            {% set ns_rm.total = ns_rm.total + qty %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td><span style="color: #17a2b8; font-weight: bold;">{{ row.item_code }}</span></td>
+                <td>{{ row.item_name or row.item_code }}</td>
+                <td style="text-align: center;"><b>{{ "%.3f" | format(qty) }}</b></td>
+            </tr>
+            {% endfor %}
+            <tr style="background-color: #d4edda; font-weight: bold;">
+                <td colspan="3" style="text-align: center;"><strong>TOTAL</strong></td>
+                <td style="text-align: center;"><strong>{{ "%.3f" | format(ns_rm.total) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{%- endif -%}
+
+{# Printing design: read attach field on doc + resolve File rows (attached_to_*). Doctype may be "Planning sheet" or "Planning Sheet". #}
+{%- set ns_img = namespace(val="", fu="") -%}
+{%- if p_sheet_banner -%}
+{%- set ns_img.val = (p_sheet_banner.custom_design_attachment or p_sheet_banner.custom_design_attachement or "") | string | trim -%}
+{%- if ns_img.val in ["None", "0"] -%}{%- set ns_img.val = "" -%}{%- endif -%}
+{%- if not ns_img.val -%}
+{%- for pi in (p_sheet_banner.planned_items or []) -%}
+{%- if not ns_img.val -%}
+{%- set row_att = (pi.custom_design_attachment or pi.custom_design_attachement or "") | string | trim -%}
+{%- if row_att and row_att not in ["None", "0"] -%}
+{%- set ns_img.val = row_att -%}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+
+{%- if doc.custom_planning_sheet -%}
+{%- for dt in ["Planning sheet", "Planning Sheet"] -%}
+{%- if not ns_img.fu -%}
+{%- set flx = frappe.get_all("File", filters=[
+    ["attached_to_doctype", "=", dt],
+    ["attached_to_name", "=", doc.custom_planning_sheet],
+    ["attached_to_field", "in", ["custom_design_attachment", "custom_design_attachement", "design_attachment", "custom_print_design"]],
+    ["is_folder", "=", 0]
+], fields=["file_url"], order_by="creation desc", limit_page_length=1) -%}
+{%- if flx -%}{%- set ns_img.fu = flx[0].file_url -%}{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- if not ns_img.fu and p_sheet_banner -%}
+{%- set _meta = frappe.get_meta("Planning sheet") if frappe.db.exists("DocType", "Planning sheet") else None -%}
+{%- set child_dt = (_meta.get_field("planned_items").options if _meta and _meta.get_field("planned_items") else "") | string | trim -%}
+{%- if child_dt -%}
+{%- for pi in (p_sheet_banner.planned_items or []) -%}
+{%- if not ns_img.fu and pi.name -%}
+{%- set flc = frappe.get_all("File", filters=[
+    ["attached_to_doctype", "=", child_dt],
+    ["attached_to_name", "=", pi.name],
+    ["attached_to_field", "in", ["custom_design_attachment", "custom_design_attachement", "design_attachment", "custom_print_design"]],
+    ["is_folder", "=", 0]
+], fields=["file_url"], order_by="creation desc", limit_page_length=1) -%}
+{%- if flc -%}{%- set ns_img.fu = flc[0].file_url -%}{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+
+{%- set design_url = "" -%}
+{%- set attach_val = ns_img.val -%}
+{%- if attach_val -%}
+{%- if attach_val.startswith("http://") or attach_val.startswith("https://") -%}
+{%- set design_url = attach_val -%}
+{%- elif attach_val.startswith("/") -%}
+{%- set design_url = frappe.utils.get_url() ~ attach_val -%}
+{%- else -%}
+{%- set fu = frappe.db.get_value("File", attach_val, "file_url") -%}
+{%- if not fu -%}
+{%- set fu = frappe.db.get_value("File", {"file_name": attach_val}, "file_url") -%}
+{%- endif -%}
+{%- if fu -%}
+{%- set design_url = fu if (fu.startswith("http://") or fu.startswith("https://")) else (frappe.utils.get_url() ~ (fu if fu.startswith("/") else "/" ~ fu)) -%}
+{%- else -%}
+{%- set design_url = frappe.utils.get_url() ~ "/files/" ~ attach_val -%}
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+{%- if not design_url and ns_img.fu -%}
+{%- set fu = ns_img.fu -%}
+{%- set design_url = fu if (fu.startswith("http://") or fu.startswith("https://")) else (frappe.utils.get_url() ~ (fu if fu.startswith("/") else "/" ~ fu)) -%}
+{%- endif -%}
+
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Printing Design</h4>
+    <div style="border: 1px solid #d1d1d1; padding: 12px; text-align: center; background-color: #fafafa; border-radius: 4px;">
+        {% if design_url %}
+        <img src="{{ design_url }}" alt="Printing design" style="max-width: 100%; height: auto; display: inline-block;" />
+        {% else %}
+        <span style="font-size: 12px; color: #666;">No design attachment on the planning sheet.</span>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .section-title {
+        background-color: #f2f2f2;
+        color: #333333;
+        padding: 8px;
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 14px;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .table td,
+    .table th {
+        vertical-align: middle !important;
+        font-size: 11px;
+        border: 1px solid #d1d1d1 !important;
+    }
+
+    th {
+        background-color: #f2f2f2 !important;
+        font-weight: bold;
+        text-align: center !important;
+    }
+
+    .spec-table th {
+        text-align: left !important;
+        background-color: #f9f9f9 !important;
+    }
+
+    .spec-table td {
+        text-align: left !important;
+        padding-left: 10px !important;
+    }
+</style>

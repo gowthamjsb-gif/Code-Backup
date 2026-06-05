@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Portal</title>
+    <!-- Modern Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Boxicons for modern icons -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+
+    <style>
+        :root {
+            /* Beautiful Green Theme Palette */
+            --primary: #16a34a;
+            /* Main Green */
+            --primary-hover: #15803d;
+            /* Darker Green for hover */
+            --primary-light: #dcfce7;
+            /* Very light green for backgrounds */
+            --bg-color: #f3f4f6;
+            /* Light gray overall background */
+            --text-dark: #1f2937;
+            --text-gray: #6b7280;
+            --white: #ffffff;
+            --border: #e5e7eb;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- LOGIN VIEW STYLES --- */
+        #login-view {
+            display: flex;
+            /* Hidden by default if we want dashboard to show */
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary-light) 0%, #ffffff 100%);
+        }
+
+        .login-box {
+            background: var(--white);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(22, 163, 74, 0.15);
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+        }
+
+        .login-box h2 {
+            color: var(--primary);
+            margin-bottom: 30px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+        }
+
+        .btn {
+            width: 100%;
+            background-color: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        #login-msg {
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* --- DASHBOARD VIEW STYLES --- */
+        #dashboard-view {
+            display: none;
+            /* Hidden by default until login */
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: var(--white);
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+
+        .logo {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            color: var(--text-gray);
+            cursor: pointer;
+            font-size: 20px;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover {
+            color: var(--danger);
+        }
+
+        /* Dashboard Layout */
+        .dashboard-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background-color: var(--white);
+            border-right: 1px solid var(--border);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-item {
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-gray);
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            border-left: 3px solid var(--primary);
+        }
+
+        .nav-item i {
+            font-size: 20px;
+        }
+
+        /* Main Content Grid */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 24px;
+            color: var(--text-dark);
+        }
+
+        .btn-small {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+
+        /* Table Styles */
+        .card {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 16px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f9fafb;
+            color: var(--text-gray);
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #f9fafb;
+        }
+
+        /* Status Pills */
+        .status-pill {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-draft {
+            background-color: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .status-open {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .status-ordered {
+            background-color: var(--primary-light);
+            color: var(--primary-hover);
+        }
+
+        .loading-text {
+            padding: 30px;
+            text-align: center;
+            color: var(--text-gray);
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ============================== -->
+    <!-- 1. LOGIN VIEW                  -->
+    <!-- ============================== -->
+    <div id="login-view">
+        <div class="login-box">
+            <img src="logo.png" alt="Jayashree Spun Bond Logo" style="height: 80px; margin-bottom: 25px;">
+
+            <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="customer@company.com">
+            </div>
+
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="••••••••">
+            </div>
+
+            <button class="btn" onclick="login()"><i class='bx bx-log-in'></i> Secure Login</button>
+
+            <div id="login-msg"></div>
+        </div>
+    </div>
+
+
+    <!-- ============================== -->
+    <!-- 2. DASHBOARD VIEW              -->
+    <!-- ============================== -->
+    <div id="dashboard-view">
+
+        <!-- Top Navigation -->
+        <nav class="navbar">
+            <div class="logo"><img src="logo.png" alt="Jayashree Spun Bond" style="height: 45px;"></div>
+            <div class="user-profile">
+                <span id="user-greeting">Welcome, Customer</span>
+                <i class='bx bx-log-out logout-btn' title="Logout" onclick="logout()"></i>
+            </div>
+        </nav>
+
+        <!-- Main Layout -->
+        <div class="dashboard-container">
+
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <div class="nav-item active" onclick="switchNav('orders', this)">
+                    <i class='bx bx-file'></i> My Purchase Orders
+                </div>
+                <div class="nav-item" onclick="switchNav('shipments', this)">
+                    <i class='bx bx-package'></i> Shipments
+                </div>
+                <div class="nav-item" onclick="switchNav('documents', this)">
+                    <i class='bx bx-file-blank'></i> Documents (COA)
+                </div>
+                <div class="nav-item" onclick="switchNav('settings', this)">
+                    <i class='bx bx-cog'></i> Settings
+                </div>
+            </aside>
+
+            <!-- Dashboard Content -->
+            <main class="main-content" id="list-content">
+                <div class="page-header">
+                    <h1>Purchase Orders</h1>
+                    <button class="btn btn-small" onclick="showNewPOView()"><i class='bx bx-plus'></i> Raise New
+                        PO</button>
+                </div>
+
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>PO Number (ERP Quotation)</th>
+                                <th>Date</th>
+                                <th>Total Amount</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-table-body">
+                            <!-- Table rows will be inserted here by JavaScript -->
+                            <tr>
+                                <td colspan="5" class="loading-text">Loading your data from ERPNext...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+
+            <!-- Dashboard Content (DETAILS) -->
+            <main class="main-content" id="details-content" style="display: none;">
+                <div class="page-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button class="btn btn-small" style="background:#f3f4f6; color:#374151;"
+                            onclick="showListView()"><i class='bx bx-arrow-back'></i> Back</button>
+                        <h1>Order: <span id="view-id" style="color:var(--primary);"></span></h1>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px; padding: 25px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <p style="color:var(--text-gray); font-size: 13px;">DATE</p>
+                            <p style="font-weight: 600;" id="view-date">-</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="color:var(--text-gray); font-size: 13px;">GRAND TOTAL</p>
+                            <p style="font-weight: 700; font-size: 20px; color:var(--primary);" id="view-total">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Quantity</th>
+                                <th>Rate</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="view-items-body">
+                            <tr>
+                                <td colspan="4" class="loading-text">Loading items...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+
+            <!-- 2C. SHIPMENTS VIEW -->
+            <main class="main-content" id="shipments-content" style="display: none;">
+                <div class="page-header">
+                    <h1>Shipments</h1>
+                </div>
+                <div class="card" style="padding: 40px; text-align: center; color: var(--text-gray);">
+                    <i class='bx bx-package' style="font-size: 64px; margin-bottom: 20px; color: #d1d5db;"></i>
+                    <h2 style="color:var(--text-dark);">No Shipments Found</h2>
+                    <p style="margin-top:10px;">Shipment tracking integration is coming soon!</p>
+                </div>
+            </main>
+
+            <!-- 2D. DOCUMENTS VIEW -->
+            <main class="main-content" id="documents-content" style="display: none;">
+                <div class="page-header">
+                    <h1>Documents & COAs</h1>
+                </div>
+                <div class="card" style="padding: 40px; text-align: center; color: var(--text-gray);">
+                    <i class='bx bx-file-blank' style="font-size: 64px; margin-bottom: 20px; color: #d1d5db;"></i>
+                    <h2 style="color:var(--text-dark);">No Documents Found</h2>
+                    <p style="margin-top:10px;">Certificates of Analysis (COAs) will securely appear here.</p>
+                </div>
+            </main>
+
+            <!-- 2E. SETTINGS VIEW -->
+            <main class="main-content" id="settings-content" style="display: none;">
+                <div class="page-header">
+                    <h1>Account Settings</h1>
+                </div>
+                <div class="card" style="padding: 40px;">
+                    <h3 style="margin-bottom:20px; color:var(--text-dark);">Preferences</h3>
+                    <p style="color: var(--text-gray); margin-bottom: 30px;">Manage your portal account preferences
+                        securely.</p>
+                    <button class="btn btn-small"
+                        style="background: white; color: var(--danger); border: 2px solid var(--danger);"
+                        onclick="logout()"><i class='bx bx-log-out'></i> Log out of Portal</button>
+                </div>
+            </main>
+
+            <!-- 2F. NEW PO VIEW -->
+            <main class="main-content" id="new-po-content" style="display: none;">
+                <div class="page-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button class="btn btn-small" style="background:#f3f4f6; color:#374151;"
+                            onclick="showListView()"><i class='bx bx-arrow-back'></i> Cancel</button>
+                        <h1>Raise New Purchase Order</h1>
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 30px;">
+                    <form id="new-po-form" onsubmit="event.preventDefault(); submitNewPO();">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Quality</label>
+                                <select id="po-quality" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                    <option value="" disabled selected>Select Quality</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Colour</label>
+                                <select id="po-colour" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                    <option value="" disabled selected>Select Colour</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">GSM</label>
+                                <input type="number" id="po-gsm" placeholder="GSM" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Width (Inch)</label>
+                                <input type="number" id="po-width" placeholder="Width" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr 1fr auto; gap: 15px; margin-bottom: 30px; align-items: flex-end;">
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Meter / Roll</label>
+                                <select id="po-meter-roll" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                    <option value="Meter">Meter</option>
+                                    <option value="Roll">Roll</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Meters / Rolls Amount</label>
+                                <input type="number" id="po-meter-roll-val" placeholder="Value" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">Quantity</label>
+                                <input type="number" id="po-qty" placeholder="Qty" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;" required>
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom: 8px; font-weight: 500;">UOM</label>
+                                <select id="po-uom" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                    <option value="Kgs" selected>Kgs</option>
+                                    <option value="Meter">Meter</option>
+                                    <option value="Roll">Roll</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-small" style="background:#f3f4f6; color:#16a34a; border: 1px solid #16a34a; padding: 11px 20px;" onclick="addItemToPO()">
+                                    <i class='bx bx-plus'></i> Add
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Pending Items Table -->
+                        <div id="pending-items-container" style="display:none; margin-bottom: 30px; border-top: 1px solid var(--border); margin-top: 20px; padding-top: 20px;">
+                            <h3 style="margin-bottom: 15px; font-size: 16px; color: var(--text-dark);">Items in this Order</h3>
+                            <div class="card">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Specification</th>
+                                            <th>Quantity</th>
+                                            <th>UOM</th>
+                                            <th>Detail</th>
+                                            <th style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pending-items-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn" id="submit-po-btn"><i class='bx bx-send'></i> Submit Order to
+                            ERPNext</button>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+
+    <!-- ============================== -->
+    <!-- 3. JAVASCRIPT LOGIC            -->
+    <!-- ===================    <script>
+        // --- ⚙️ CONFIGURATION ---
+        // PURE FRONTEND MOCK VERSION (No Proxy Required)
+        
+        // --- UI ELEMENTS ---
+        const loginView = document.getElementById('login-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        const loginMsg = document.getElementById('login-msg');
+
+        // --- 1. MOCK LOGIN FUNCTION ---
+        function login() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!email || !password) {
+                showMsg('Please enter both email and password', 'var(--warning)');
+                return;
+            }
+
+            showMsg('Authenticating...', 'var(--text-gray)');
+
+            // Mock login validation
+            setTimeout(() => {
+                if (email.includes('@') && password.length > 0) {
+                    showMsg('Login Successful!', 'var(--primary)');
+                    const customerName = "Gowtham A V"; // Mock user name
+                    document.getElementById('user-greeting').innerText = `Welcome, ${customerName}`;
+
+                    localStorage.setItem("customer_name", customerName);
+
+                    setTimeout(() => {
+                        loginView.style.display = 'none';
+                        dashboardView.style.display = 'flex';
+                        renderMockData(); // Load the mock table
+                    }, 800);
+                } else {
+                    showMsg('Invalid email format.', 'var(--danger)');
+                }
+            }, 600);
+        }
+
+        // --- 2. RENDER TABLE WITH MOCK DATA ---
+        function renderMockData() {
+            const mockData = [
+                { name: "PO-2026-001", transaction_date: "2026-03-15", grand_total: 15400.00, status: "Open" },
+                { name: "PO-2026-002", transaction_date: "2026-03-12", grand_total: 8200.50, status: "Ordered" },
+                { name: "PO-2026-003", transaction_date: "2026-03-10", grand_total: 50000.00, status: "Draft" },
+                { name: "PO-2026-004", transaction_date: "2026-02-28", grand_total: 1250.75, status: "Ordered" },
+                { name: "PO-2026-005", transaction_date: "2026-02-15", grand_total: 98000.00, status: "Open" },
+            ];
+            
+            const tbody = document.getElementById('po-table-body');
+            tbody.innerHTML = '';
+
+            mockData.forEach(po => {
+                let statusClass = 'status-draft';
+                if (po.status === 'Open') statusClass = 'status-open';
+                if (po.status === 'Ordered') statusClass = 'status-ordered';
+
+                const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(po.grand_total);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${po.name}</strong></td>
+                    <td>${po.transaction_date}</td>
+                    <td>${formattedTotal}</td>
+                    <td><span class="status-pill ${statusClass}">${po.status}</span></td>
+                    <td><button style="padding:6px 12px; background:none; border:1px solid var(--border); border-radius:4px; font-size:13px; cursor:pointer;" onclick="viewQuotation('${po.name}')">View</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 4. VIEW QUOTATION DETAILS (MOCK) ---
+        const listContent = document.getElementById('list-content');
+        const detailsContent = document.getElementById('details-content');
+
+        function showListView() {
+            detailsContent.style.display = 'none';
+            document.getElementById('new-po-content').style.display = 'none';
+            listContent.style.display = 'block';
+        }
+
+        function viewQuotation(poName) {
+            listContent.style.display = 'none';
+            detailsContent.style.display = 'block';
+
+            document.getElementById('view-id').innerText = poName;
+            document.getElementById('view-date').innerText = "2026-03-15"; // Mock date
+            
+            // Generate some random item data
+            const items = [
+                { item_code: "PB-1006105", item_name: "Polybag Roll 60 GSM", qty: 50, uom: "Roll", rate: 500, amount: 25000 },
+                { item_code: "NW-40GSM-GRN", item_name: "Non Woven Green 40 GSM", qty: 100, uom: "Kgs", rate: 120, amount: 12000 }
+            ];
+
+            let grandTotal = items.reduce((sum, item) => sum + item.amount, 0);
+            document.getElementById('view-total').innerText = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(grandTotal);
+
+            const tbody = document.getElementById('view-items-body');
+            tbody.innerHTML = '';
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${item.item_code}</strong><br><small style="color:var(--text-gray);">${item.item_name}</small></td>
+                    <td>${item.qty} ${item.uom}</td>
+                    <td>${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.rate)}</td>
+                    <td><strong>${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.amount)}</strong></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 5. SIDEBAR NAVIGATION ---
+        function switchNav(viewId, element) {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+
+            document.getElementById('list-content').style.display = 'none';
+            document.getElementById('details-content').style.display = 'none';
+            document.getElementById('shipments-content').style.display = 'none';
+            document.getElementById('documents-content').style.display = 'none';
+            document.getElementById('settings-content').style.display = 'none';
+            document.getElementById('new-po-content').style.display = 'none';
+
+            if (viewId === 'orders') {
+                document.getElementById('list-content').style.display = 'block';
+            } else {
+                document.getElementById(`${viewId}-content`).style.display = 'block';
+            }
+        }
+
+        // --- 6. RAISE NEW PO (MOCK) ---
+        function showNewPOView() {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            document.querySelector('.nav-item').classList.add('active');
+
+            document.getElementById('list-content').style.display = 'none';
+            document.getElementById('details-content').style.display = 'none';
+            document.getElementById('shipments-content').style.display = 'none';
+            document.getElementById('documents-content').style.display = 'none';
+            document.getElementById('settings-content').style.display = 'none';
+            document.getElementById('new-po-content').style.display = 'block';
+
+            // Populate mock Quality and Colour
+            const qSelect = document.getElementById('po-quality');
+            const cSelect = document.getElementById('po-colour');
+            
+            qSelect.innerHTML = '<option value="" disabled selected>Select Quality</option><option value="Premium">Premium</option><option value="Standard">Standard</option>';
+            cSelect.innerHTML = '<option value="" disabled selected>Select Colour</option><option value="Green">Green</option><option value="White">White</option><option value="Blue">Blue</option>';
+        }
+
+        // --- 7. MULTI-ITEM PO LOGIC ---
+        let pendingPOItems = [];
+
+        function addItemToPO() {
+            const qualityName = document.getElementById('po-quality').value;
+            const colourName = document.getElementById('po-colour').value;
+            const gsm = document.getElementById('po-gsm').value;
+            const width = document.getElementById('po-width').value;
+            const meterRollType = document.getElementById('po-meter-roll').value;
+            const meterRollVal = document.getElementById('po-meter-roll-val').value;
+            const qty = document.getElementById('po-qty').value;
+            const uom = document.getElementById('po-uom').value;
+
+            if (!qualityName || !colourName || !gsm || !width || !qty) {
+                alert("Please fill in required fields (Quality, Colour, GSM, Width, Quantity).");
+                return;
+            }
+
+            pendingPOItems.push({
+                quality_name: qualityName,
+                colour_name: colourName,
+                gsm: gsm,
+                width_inch: width,
+                meter_roll_type: meterRollType,
+                meter_roll_val: meterRollVal,
+                qty: parseFloat(qty),
+                uom: uom
+            });
+
+            updatePendingItemsUI();
+            
+            document.getElementById('po-gsm').value = '';
+            document.getElementById('po-width').value = '';
+            document.getElementById('po-meter-roll-val').value = '';
+            document.getElementById('po-qty').value = '';
+        }
+        function updatePendingItemsUI() {
+            const container = document.getElementById('pending-items-container');
+            const tbody = document.getElementById('pending-items-body');
+            tbody.innerHTML = '';
+
+            if (pendingPOItems.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            pendingPOItems.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <strong>${item.quality_name}</strong> - ${item.colour_name}<br>
+                        <small>${item.gsm} GSM | ${item.width_inch}" Width</small>
+                    </td>
+                    <td>${item.qty}</td>
+                    <td>${item.uom}</td>
+                    <td>${item.meter_roll_val ? `${item.meter_roll_val} ${item.meter_roll_type}(s)` : '-'}</td>
+                    <td>
+                        <button type="button" onclick="removeItemFromPO(${index})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:18px;">
+                            <i class='bx bx-trash'></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function removeItemFromPO(index) {
+            pendingPOItems.splice(index, 1);
+            updatePendingItemsUI();
+        }
+
+        function submitNewPO() {
+            if (pendingPOItems.length === 0) {
+                alert("Please add at least one item to your order.");
+                return;
+            }
+
+            const btn = document.getElementById('submit-po-btn');
+            btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Submitting (Mock)...";
+            btn.disabled = true;
+
+            setTimeout(() => {
+                alert("🎉 Purchase Order successfully created! (Mock Mode)");
+                document.getElementById('new-po-form').reset();
+                pendingPOItems = [];
+                updatePendingItemsUI();
+                showListView();
+                renderMockData(); // Refresh the mock table
+                
+                btn.innerHTML = "<i class='bx bx-send'></i> Submit Order";
+                btn.disabled = false;
+            }, 1000);
+        }
+
+        // --- HELPER FUNCTIONS ---
+        function showMsg(text, color) {
+            loginMsg.style.color = color;
+            loginMsg.innerText = text;
+        }
+
+        function logout() {
+            localStorage.removeItem("customer_name");
+            window.location.reload();
+        }
+
+        // --- INITIALIZE APP ---
+        window.onload = function () {
+            const savedName = localStorage.getItem("customer_name");
+            if (savedName) {
+                document.getElementById('user-greeting').innerText = `Welcome, ${savedName}`;
+                document.getElementById('login-view').style.display = 'none';
+                document.getElementById('dashboard-view').style.display = 'flex';
+                renderMockData();
+            }
+        };
+    </script>
+</body>
+
+</html>

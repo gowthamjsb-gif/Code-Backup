@@ -1,0 +1,19 @@
+{% if doc.custom_unit == "Lamination" %}
+    <!-- ========================================== -->
+    <!-- PASTE LAMINATION UNIT TEMPLATE HTML HERE   -->
+    <!-- (production_plan_print_template_lamination_unit.html) -->
+    <!-- ========================================== -->
+    
+{% elif doc.custom_unit == "Slitting" %}
+    <!-- ========================================== -->
+    <!-- PASTE SLITTING UNIT TEMPLATE HTML HERE     -->
+    <!-- (production_plan_print_template_slitting_unit.html) -->
+    <!-- ========================================== -->
+
+{% else %}
+    <!-- ========================================== -->
+    <!-- PASTE REGULAR/DEFAULT TEMPLATE HTML HERE   -->
+    <!-- (production_plan_print_template.html)      -->
+    <!-- ========================================== -->
+    
+{% endif %}

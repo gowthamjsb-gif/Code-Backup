@@ -1,0 +1,168 @@
+    <div class="print-header">
+        <div class="row">
+            <div class="col-xs-12" style="text-align: left;">
+                <h2 style="margin-top:0; color: #17a2b8; font-size: 30px;"><b>Slitting Order Sheet</b></h2>
+                <p style="font-size: 14px;"><strong>ID:</strong> {{ doc.name }}</p>
+                <p style="font-size: 14px;"><strong>Order Code:</strong> {{ doc.custom_party_code or "" }}</p>
+                <p style="font-size: 14px;"><strong>Ordered Date:</strong> {{ doc.get_formatted("posting_date") }}</p>
+                <p style="font-size: 14px;"><strong>Progress:</strong> {{ doc.status }}</p>
+            </div>
+        </div>
+    </div>
+
+    <hr style="border-top: 2px solid #eee; margin-top: 20px;">
+
+    <div class="section">
+        <h4 class="section-title">Fabric Specifications</h4>
+        <table class="table table-bordered table-condensed spec-table">
+            <tbody>
+                <tr>
+                    <th style="width: 20%;">Unit</th>
+                    <td style="width: 30%;">Slitting unit</td>
+                    <th style="width: 20%;">Label</th>
+                    <td style="width: 30%;">{{ doc.custom_label or "" }}</td>
+                </tr>
+                <tr>
+                    <th>Packing</th>
+                    <td colspan="3">{{ doc.custom_packing or "" }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+
+    <div class="section" style="margin-top: 20px;">
+        <h4 class="section-title">Finished Goods Details</h4>
+        {% set base_pp = None %}
+        {% if doc.custom_custom_linked_plan %}
+            {% set link_parts = doc.custom_custom_linked_plan.split(",") %}
+            {% set first_linked = link_parts[0] | trim %}
+            {% if frappe.db.exists("Production Plan", first_linked) %}
+                {% set base_pp = frappe.get_doc("Production Plan", first_linked) %}
+            {% endif %}
+        {% endif %}
+
+        {% for row in doc.po_items %}
+        {%- set base_item = base_pp.po_items[loop.index0] if base_pp and base_pp.po_items and loop.index0 < base_pp.po_items|length else None -%}
+        {%- set b_wid = base_item.custom_width_ if base_item else "" -%}
+        {%- set c_meter = row.custom_meterperroll if row.custom_meterperroll else (base_item.custom_meterperroll if base_item else "") -%}
+
+        {#- Input Rolls: rolls going INTO the slitter = from the linked child production plan (the big input rolls) -#}
+        {%- if base_item and base_item.custom_no_of_rolls -%}
+            {%- set input_rolls = base_item.custom_no_of_rolls | int -%}
+        {%- elif base_item and base_item.custom_no_of_rolls_ -%}
+            {%- set input_rolls = base_item.custom_no_of_rolls_ | int -%}
+        {%- else -%}
+            {%- set input_rolls = 0 -%}
+        {%- endif -%}
+
+        {#- Output Rolls: rolls coming OUT of the slitter = from the current doc row (the finished slitted rolls) -#}
+        {%- if row.custom_no_of_rolls -%}
+            {%- set output_rolls = row.custom_no_of_rolls | int -%}
+        {%- elif row.custom_no_of_rolls_ -%}
+            {%- set output_rolls = row.custom_no_of_rolls_ | int -%}
+        {%- elif row.custom_gsm and row.custom_width_ and c_meter and row.planned_qty -%}
+            {%- set g_wt = (row.custom_gsm | float * row.custom_width_ | float * c_meter | float * 0.0254 / 1000) -%}
+            {%- set output_rolls = (row.planned_qty | float / g_wt) | round(0, 'ceil') | int if g_wt > 0 else 0 -%}
+        {%- else -%}
+            {%- set output_rolls = 0 -%}
+        {%- endif -%}
+
+        {%- set b_gsm = base_item.custom_gsm if base_item else "" -%}
+        {%- set b_meter = base_item.custom_meterperroll if (base_item and base_item.custom_meterperroll) else c_meter -%}
+        {%- set row_quality = row.custom_quality or doc.custom_quality or "" -%}
+        {%- set row_color = row.custom_color or "" -%}
+        {%- set base_quality = base_item.custom_quality if (base_item and base_item.custom_quality) else row_quality -%}
+        {%- set base_color = base_item.custom_color if (base_item and base_item.custom_color) else row_color -%}
+
+        {%- set b_qty = 0.0 -%}
+        {%- if b_gsm and b_wid and b_meter and input_rolls -%}
+        {%- set b_qty = (b_gsm | float * b_wid | float * b_meter | float * 0.0254 / 1000) * (input_rolls | float) -%}
+        {%- endif -%}
+
+        <table class="table table-bordered table-condensed"
+            style="border: 2px solid #000; margin-bottom: 25px; border-collapse: collapse;">
+            <tbody>
+                <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
+                    <td style="border: 1px solid #000; width: 80px; font-weight: bold;"></td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Quality</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Color</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Roll Size</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Length/Roll<br>(Mtrs)</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">No. of Rolls</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Kgs)</td>
+                </tr>
+                <tr>
+                    <td style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">Input</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ base_quality }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ base_color }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ b_gsm }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ b_wid }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ b_meter }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ input_rolls }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ "%.2f" | format(b_qty) if b_qty > 0 else "-" }}</td>
+                </tr>
+                <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
+                    <td style="border: 1px solid #000;"></td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Quality</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Color</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Roll Size</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Length/Roll<br>(Mtrs)</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">No. of Rolls</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Kgs)</td>
+                </tr>
+                <tr>
+                    <td style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">Output</td>
+                    <td style="border: 1px solid #000; text-align: center; color: #17a2b8; font-weight: bold;">{{ row_quality }}</td>
+                    <td style="border: 1px solid #000; text-align: center; color: #17a2b8; font-weight: bold;">{{ row_color }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ row.custom_gsm or "" }}</td>
+                    <td style="border: 1px solid #000; text-align: center; color: #17a2b8; font-weight: bold;">{{ row.custom_width_ or "" }}</td>
+                    <td style="border: 1px solid #000; text-align: center;">{{ c_meter }}</td>
+                    <td style="border: 1px solid #000; text-align: center;"><b>{{ output_rolls }}</b></td>
+                    <td style="border: 1px solid #000; text-align: center;"><b>{{ "%.2f" | format(row.planned_qty | float) }}</b></td>
+                </tr>
+            </tbody>
+        </table>
+        {% endfor %}
+    </div>
+
+
+
+
+    <style>
+        .section-title {
+            background-color: #f8f9fa;
+            padding: 8px;
+            font-weight: bold;
+            border-left: 4px solid #17a2b8;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .table td,
+        .table th {
+            vertical-align: middle !important;
+            font-size: 11px;
+            border: 1px solid #d1d1d1 !important;
+        }
+
+        th {
+            background-color: #f2f2f2 !important;
+            font-weight: bold;
+            text-align: center !important;
+        }
+
+        .spec-table th {
+            text-align: left !important;
+            background-color: #f9f9f9 !important;
+        }
+
+        .spec-table td {
+            text-align: left !important;
+            padding-left: 10px !important;
+        }
+    </style>

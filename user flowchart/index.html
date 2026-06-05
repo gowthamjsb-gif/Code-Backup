@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERPNext User Roles & Workflow Layout</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>ERPNext Workflow Layout Sketch</h1>
+        <div class="header-actions">
+            <span>Operational Flow Overview</span>
+        </div>
+    </header>
+    <main>
+        <section id="flowchart-container">
+            <div class="mermaid">
+                graph TD
+                    %% Styles
+                    classDef default fill:#1e293b,stroke:#6366f1,stroke-width:2px,color:#fff;
+                    classDef governance fill:#1e293b,stroke:#a855f7,stroke-width:2px,stroke-dasharray: 5 5;
+                    classDef data fill:#0f172a,stroke:#475569,stroke-width:1px,color:#94a3b8;
+
+                    %% Department Nodes
+                    DomCRM[Domestic CRM]
+                    ExpCRM[Export CRM]
+                    Accounts[Accounts Team]
+                    Planning[Planning Dept]
+                    ProdAdmin[Production Admin]
+                    ProdCoord[Production Coordinator]
+                    ProdSuper[Production Supervisor]
+                    Despatch[Despatch Team]
+                    SuperAdmin[Super Admins]:::governance
+                    ERPTeam[ERP Teams]:::governance
+
+                    %% Workflow Connectors
+                    DomCRM -->|Sales Order| Accounts
+                    ExpCRM -->|Export Sales Order| Accounts
+                    
+                    Accounts -->|Credit Approval| Planning
+                    Planning -->|Production Plan| ProdAdmin
+                    
+                    subgraph Production_Cycle [Production Operations]
+                        ProdAdmin -->|Work Order & BOM| ProdCoord
+                        ProdCoord -->|Scheduling| ProdSuper
+                        ProdSuper -->|Job Card Status| ProdAdmin
+                    end
+
+                    ProdSuper -->|FG Receipt| Despatch
+                    Despatch -->|Delivery Note| Accounts
+                    Accounts -->|Final Invoice| Payment[Payment Success]:::data
+
+                    %% Governance Connectors
+                    SuperAdmin -.-> DomCRM
+                    SuperAdmin -.-> ExpCRM
+                    ERPTeam -.-> Accounts
+                    ERPTeam -.-> Planning
+                    ERPTeam -.-> ProdAdmin
+            </div>
+        </section>
+        <aside id="details-panel">
+            <div class="panel-header">
+                <h2>Role Responsibilities</h2>
+                <p>Click or hover over a role in the flowchart or list below to see details.</p>
+            </div>
+            <div id="role-list">
+                <!-- Script will populate this -->
+            </div>
+        </aside>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>

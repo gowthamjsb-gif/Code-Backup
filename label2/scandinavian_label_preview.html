@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scandinavian 6x4 Preview (no barcode)</title>
+  <style>
+    @media print {
+      .btn-panel { display: none !important; }
+      @page { size: 6in 4in; margin: 0; }
+      body { margin: 0; }
+    }
+    body {
+      margin: 0;
+      background: #eee;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .btn-panel {
+      padding: 10px;
+      text-align: center;
+      background: #eee;
+    }
+    .label {
+      width: 6in;
+      height: 4in;
+      min-width: 6in;
+      min-height: 4in;
+      max-width: 6in;
+      max-height: 4in;
+      margin: 12px auto;
+      background: #fff;
+      box-sizing: border-box;
+      border: 2px solid #111;
+      padding: 8px 12px 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    .top-block { flex: 0 0 auto; }
+    .top-block > p:nth-child(1) { margin: 0 0 2px; }
+    .top-block > p:nth-child(2) { margin: 0 0 6px; }
+    .top-block > p:nth-child(3) { margin: 5px 0 3px; }
+    .top-block > p:nth-child(4) { margin: 0 0 8px; }
+    .line-label { font-size: 14px; font-weight: 400; margin: 0; }
+    .line-value { font-size: 40px; font-weight: 700; margin: 0; line-height: 0.98; letter-spacing: -0.5px; }
+    .line-caption { font-size: 14px; margin: 0; }
+    .line-text { font-size: 18px; font-weight: 700; margin: 0; line-height: 1.1; }
+    .mid-wrap {
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: stretch;
+      align-items: stretch;
+    }
+    .row-dual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 16px;
+      width: 100%;
+      margin-top: 2px;
+      margin-bottom: 4px;
+      align-items: start;
+    }
+    .row-dual .cell-right .k, .row-dual .cell-right .v { text-align: right; }
+    .grid-spec {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      column-gap: 16px;
+      row-gap: 2px;
+      align-content: stretch;
+      justify-items: stretch;
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3px 0;
+      min-height: 0;
+    }
+    .cell .k { font-size: 13px; font-weight: 400; margin: 0; line-height: 1.1; }
+    .cell .v { font-size: 23px; font-weight: 700; line-height: 1.05; margin-top: 2px; min-height: 1.05em; }
+    .cell-mid { text-align: center; align-items: center; }
+    .cell-mid .k, .cell-mid .v { text-align: center; }
+    .cell-right { text-align: right; align-items: flex-end; }
+    .cell-right .k, .cell-right .v { text-align: right; }
+    .footer { flex: 0 0 auto; padding-top: 2px; }
+    .cust-name { text-align: center; font-size: 17px; font-weight: 700; margin: 0; }
+    .cust-addr { text-align: center; font-size: 11px; margin-top: 2px; text-decoration: underline; }
+    .cust-contact { text-align: center; font-size: 10px; margin-top: 2px; line-height: 1.2; }
+  </style>
+</head>
+<body>
+  <div class="btn-panel">
+    <button onclick="window.print()" style="padding:10px 20px;font-weight:bold;cursor:pointer;">PRINT</button>
+    <button onclick="window.close()" style="padding:10px 20px;margin-left:10px;">CLOSE</button>
+  </div>
+
+  <div class="label">
+    <div class="top-block">
+      <p class="line-label">Article No</p>
+      <p class="line-value">S020W1275HO50L</p>
+      <p class="line-caption">Article</p>
+      <p class="line-text">Spunbond white 20g 1275 mm HO</p>
+    </div>
+
+    <div class="mid-wrap">
+      <div class="row-dual">
+        <div class="cell"><div class="k">Tracking No</div><div class="v">250152</div></div>
+        <div class="cell cell-right"><div class="k">Length per roll (m)</div><div class="v">6000</div></div>
+      </div>
+      <div class="grid-spec">
+        <div class="cell"><div class="k">Basis Weight (g/m²)</div><div class="v">20</div></div>
+        <div class="cell cell-mid"><div class="k">Rolls in package</div><div class="v">1</div></div>
+        <div class="cell cell-right"><div class="k">Width (mm)</div><div class="v">1275</div></div>
+        <div class="cell"><div class="k">m² in package</div><div class="v">7650</div></div>
+        <div class="cell cell-mid"><div class="k">Kg per package</div><div class="v"></div></div>
+        <div class="cell cell-right"><div class="k">Treatment</div><div class="v">HO</div></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="cust-name">Scandinavian Nonwoven AB</div>
+      <div class="cust-addr">Alevagen 1 - S-291 62 Kristianstad - Sweden</div>
+      <div class="cust-contact">Tel: +46 44 203960 - info@nonwoven.se - www.nonwoven.se</div>
+    </div>
+  </div>
+</body>
+</html>

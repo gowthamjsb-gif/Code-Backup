@@ -1,0 +1,344 @@
+<style>
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        line-height: 1.2;
+        margin: 0;
+        padding: 0;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-bottom: 20px;
+    }
+
+    th,
+    td {
+        padding: 4px;
+        border: 1px solid #000;
+        word-wrap: normal !important;
+        font-size: 9.5px;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tr {
+        page-break-inside: avoid;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .nowrap {
+        white-space: nowrap !important;
+    }
+
+    .outside-label {
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    .section-header {
+        background-color: #f3ede2 !important;
+        color: #000 !important;
+        font-size: 11px;
+        padding: 6px;
+        border: 1px solid #000;
+        border-bottom: none;
+        text-transform: uppercase;
+        margin-top: 10px;
+    }
+
+    .col-header-bg {
+        background-color: #f2f2f2 !important;
+        color: #000 !important;
+    }
+
+    .balance-bg {
+        background-color: #d9edf7 !important;
+        color: #000 !important;
+    }
+
+    .grand-total-bg {
+        background-color: #f3ede2 !important;
+        border: 2px solid #000 !important;
+    }
+
+    .company-logo {
+        max-width: 200px;
+        max-height: 60px;
+        float: right;
+    }
+</style>
+
+{%
+var logo_url = "";
+var address_display = "Address not found";
+var gst_no = "";
+var phone_no = "";
+var email_id = "";
+var state_name = "";
+
+if (filters && filters.company) {
+frappe.call({
+method: "frappe.client.get_value",
+args: { doctype: "Company", filters: { name: filters.company }, fieldname: ["company_logo", "phone_no", "email"] },
+async: false,
+callback: function(r) {
+if (r && r.message) {
+logo_url = r.message.company_logo || "";
+phone_no = r.message.phone_no || "";
+email_id = r.message.email || "";
+}
+}
+});
+
+frappe.call({
+method: "frappe.client.get_list",
+args: {
+doctype: "Address",
+filters: [["Dynamic Link", "link_doctype", "=", "Company"], ["Dynamic Link", "link_name", "=", filters.company]],
+fields: ["address_line1", "address_line2", "city", "state", "country", "pincode", "gstin", "email_id", "phone",
+"is_your_company_address"],
+limit_page_length: 5
+},
+async: false,
+callback: function(r) {
+if (r && r.message && r.message.length > 0) {
+var addr = r.message[0];
+for (var k=0; k<r.message.length; k++) { if (r.message[k].is_your_company_address) { addr=r.message[k]; break; } } var
+    pts=[]; if (addr.address_line1) pts.push(addr.address_line1); if (addr.address_line2) pts.push(addr.address_line2);
+    var cp=(addr.city || "" ) + (addr.pincode ? (" - " + addr.pincode) : "");
+                    if (cp) pts.push(cp);
+                    if (addr.country) pts.push(addr.country);
+                    address_display = pts.join(" <br>");
+    gst_no = addr.gstin || "";
+    state_name = addr.state || "";
+    }
+    }
+    });
+    }
+
+    var r_list = [], p_list = [], j_list = [], c_list = [], o_list = [];
+    var r_sum = 0, p_sum = 0, j_sum = 0, c_sum = 0, o_sum = 0;
+    var open_bal_amt = 0;
+    var grand_total_debit = 0;
+    var grand_total_credit = 0;
+
+    if (data && data.length > 0) {
+    for (var i=0; i<data.length; i++) { var row=data[i]; var vno=(row["Voucher No"] || row["voucher_no"] || "" ); var
+        vtp=(row["Voucher Type"] || row["voucher_type"] || "" ).toLowerCase(); var d_amt=parseFloat(row["Debit"] ||
+        row["debit"] || 0); var c_amt=parseFloat(row["Credit"] || row["credit"] || 0); var row_amt=d_amt + c_amt; var
+        is_open=(!vno && (row["Particulars"] || "" ).indexOf("Opening")> -1);
+        if (is_open) {
+        open_bal_amt = parseFloat(row["balance"] || 0);
+        } else if (vno && (row["Posting Date"] || row["posting_date"])) {
+        grand_total_debit += d_amt;
+        grand_total_credit += c_amt;
+        if (vno.toUpperCase().indexOf("RECEIPT") > -1 || vtp.indexOf("receipt") > -1) { r_list.push(row); r_sum +=
+        row_amt; }
+        else if (vno.toUpperCase().indexOf("PAYMENT") > -1 || vtp.indexOf("payment") > -1) { p_list.push(row); p_sum +=
+        row_amt; }
+        else if (vtp.indexOf("journal") > -1) { j_list.push(row); j_sum += row_amt; }
+        else if (vtp.indexOf("contra") > -1) { c_list.push(row); c_sum += row_amt; }
+        else { o_list.push(row); o_sum += row_amt; }
+        }
+        }
+        }
+
+        var closing_bal = open_bal_amt + grand_total_debit - grand_total_credit;
+
+        var payment_entries = [];
+        for (var i=0; i<data.length; i++) {
+            var vno = data[i]["Voucher No"] || data[i]["voucher_no"] || "";
+            var vtp = data[i]["Voucher Type"] || data[i]["voucher_type"] || "";
+            if (vno && (vtp === "Payment Entry" || vtp === "Receipt")) {
+                payment_entries.push(vno);
+            }
+        }
+
+        var party_name_map = {};
+        if (payment_entries.length > 0) {
+            frappe.call({
+                method: "frappe.client.get_list",
+                args: {
+                    doctype: "Payment Entry",
+                    filters: [["name", "in", payment_entries]],
+                    fields: ["name", "party", "party_name"],
+                    limit_page_length: 1000
+                },
+                async: false,
+                callback: function(r) {
+                    if (r && r.message) {
+                        for (var j=0; j<r.message.length; j++) {
+                            var pe = r.message[j];
+                            party_name_map[pe.name] = pe.party_name || pe.party || "";
+                        }
+                    }
+                }
+            });
+        }
+
+        var get_party_name = function(r) {
+            var vno = r["Voucher No"] || r["voucher_no"] || "";
+            var p_name = r["Party Name"] || r["party_name"] || "";
+            var p_code = r["Party"] || r["party"] || r["against"] || r["Against"] || "";
+            var a_name = r["Account Name"] || r["account_name"] || "";
+            var a_code = r["account"] || r["Account"] || "";
+
+            if (vno && party_name_map[vno]) {
+                return party_name_map[vno];
+            }
+
+            if (p_name) return p_name;
+            if (p_code) return p_code;
+            if (a_name) return a_name;
+            if (a_code) return a_code;
+            return "-";
+        };
+
+        var get_date_str = function(r) {
+        var d = r["Posting Date"] || r["posting_date"] || "";
+        return d ? frappe.datetime.str_to_user(d) : "";
+        };
+
+        var get_amt = function(r) {
+        return parseFloat(r["Debit"] || r["debit"] || r["Credit"] || r["credit"] || 0);
+        };
+
+        var final_sections = [
+        { t: "RECEIPT ENTRIES", r: r_list, s: r_sum },
+        { t: "PAYMENT ENTRIES", r: p_list, s: p_sum },
+        { t: "JOURNAL ENTRIES", r: j_list, s: j_sum },
+        { t: "CONTRA ENTRIES", r: c_list, s: c_sum },
+        { t: "OTHER ENTRIES", r: o_list, s: o_sum }
+        ];
+        %}
+
+        <div style="width: 100%;">
+            <div class="outside-label">BANK STATEMENT</div>
+            <table width="100%" style="border: 1px solid #000; border-collapse: collapse; margin-bottom: 10px;">
+                <tr>
+                    <td width="60%" style="padding: 10px; vertical-align: top; border-right: 1px solid #000;">
+                        <div class="bold" style="font-size:15px;">{%= (filters.company || "").toUpperCase() %}</div>
+                        <div style="margin-top:6px; line-height: 1.3;">
+                            {%= address_display %}<br>
+                            {% if (gst_no) { %}<b>GSTIN:</b> {%= gst_no %}<br>{% } %}
+                            {% if (email_id) { %}<b>Email:</b> {%= email_id %}<br>{% } %}
+                            {% if (phone_no) { %}<b>Phone:</b> {%= phone_no %}<br>{% } %}
+                            {% if (state_name) { %}<b>State:</b> {%= state_name %}<br>{% } %}
+                        </div>
+                    </td>
+                    <td width="40%" class="text-right" style="padding: 10px; vertical-align: top;">
+                        {% if (logo_url) { %}<img src="{%= logo_url %}" class="company-logo">{% } %}
+                        <div style="margin-top: 15px; line-height: 1.4;">
+                            <b>Report Date:</b> {%= frappe.datetime.str_to_user(frappe.datetime.nowdate()) %}<br>
+                            {% if (filters.from_date) { %}<b>From:</b> {%=
+                            frappe.datetime.str_to_user(filters.from_date) %}<br>{% } %}
+                            {% if (filters.to_date) { %}<b>To:</b> {%= frappe.datetime.str_to_user(filters.to_date) %}{%
+                            } %}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="balance-bg bold"
+                style="padding: 10px; border: 1px solid #000; margin-bottom: 15px; font-size: 13px;">
+                OPENING BALANCE: {%= format_currency(open_bal_amt, "INR") %}
+            </div>
+
+            {%
+            for (var x=0; x<final_sections.length; x++) { var cur=final_sections[x]; if (cur.r.length> 0) {
+                %}
+                <div class="section-header bold text-center">{%= cur.t %}</div>
+                <table width="100%">
+                    <colgroup>
+                        <col style="width: 10%;">
+                        <col style="width: 33%;">
+                        <col style="width: 16%;">
+                        <col style="width: 18%;">
+                        <col style="width: 23%;">
+                    </colgroup>
+                    <thead>
+                        <tr class="bold text-center col-header-bg">
+                            <th>Date</th>
+                            <th>Party Name</th>
+                            <th>Voucher Type</th>
+                            <th>Voucher Number</th>
+                            <th>Amount (INR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for (var y=0; y<cur.r.length; y++) { %} <tr>
+                            <td class="text-center nowrap">{%= get_date_str(cur.r[y]) %}</td>
+                            <td class="text-left">{%= get_party_name(cur.r[y]) %}</td>
+                            <td class="text-center nowrap">{%= cur.r[y]["Voucher Type"] || cur.r[y]["voucher_type"] ||
+                                "" %}</td>
+                            <td class="text-center nowrap">{%= cur.r[y]["Voucher No"] || cur.r[y]["voucher_no"] || "" %}
+                            </td>
+                            <td class="text-right nowrap">{%= format_currency(get_amt(cur.r[y]), "INR") %}</td>
+                            </tr>
+                            {% } %}
+                            <tr class="bold balance-bg">
+                                <td colspan="4" class="text-right">TOTAL {%= cur.t %}</td>
+                                <td class="text-right nowrap">{%= format_currency(cur.s, "INR") %}</td>
+                            </tr>
+                    </tbody>
+                </table>
+                {% }
+                }
+                %}
+
+                <div class="section-header bold text-center grand-total-bg" style="border: 1px solid #000;">CONSOLIDATED
+                    SUMMARY</div>
+                <table width="100%" style="margin-top:0;">
+                    <colgroup>
+                        <col style="width: 77%;">
+                        <col style="width: 23%;">
+                    </colgroup>
+                    <tbody>
+                        <tr>
+                            <td class="text-right bold">TOTAL INFLOW (RECEIPTS)</td>
+                            <td class="text-right">{%= format_currency(grand_total_debit, "INR") %}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-right bold">TOTAL OUTFLOW (PAYMENTS)</td>
+                            <td class="text-right">{%= format_currency(grand_total_credit, "INR") %}</td>
+                        </tr>
+                        <tr class="bold balance-bg" style="font-size:13px;">
+                            <td class="text-right" style="padding:10px;">CLOSING BALANCE</td>
+                            <td class="text-right" style="padding:10px;">{%= format_currency(closing_bal, "INR") %}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="text-align: center; font-weight: bold; margin-top: 20px; page-break-before: avoid;">This is
+                    a Computer Generated Report</div>
+        </div>
+
+        <div id="footer-html" class="visible-pdf" style="display: none;">
+            <div style="text-align: center; font-size: 11px; font-weight: bold;">Page <span class="page"></span> of
+                <span class="topage"></span>
+            </div>
+        </div>

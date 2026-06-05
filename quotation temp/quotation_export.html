@@ -1,0 +1,402 @@
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th,
+    td {
+        padding: 4px;
+    }
+
+    .border th,
+    .border td {
+        border: 1px solid #000;
+    }
+
+    .header-box {
+        border: 1px solid #000;
+        padding: 10px;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .bold {
+        font-weight: bold;
+    }
+
+    .mt-10 {
+        margin-top: 10px;
+    }
+
+    .mt-20 {
+        margin-top: 20px;
+    }
+
+    .address-container {
+        line-height: 1.3;
+    }
+
+    .outside-label {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    .keep-together {
+        page-break-inside: avoid;
+    }
+
+    /* Crucial CSS blocks for clean page breaking */
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    tfoot {
+        display: table-footer-group;
+    }
+
+    .company-logo {
+        max-width: 280px;
+        max-height: 120px;
+        width: auto;
+        height: auto;
+    }
+</style>
+
+{% set billing_addr = frappe.get_doc("Address", doc.customer_address) if doc.customer_address else None %}
+{% if doc.shipping_address_name %}
+{% set shipping_addr = frappe.get_doc("Address", doc.shipping_address_name) %}
+{% elif doc.shipping_address %}
+{% set shipping_addr = frappe.get_doc("Address", doc.shipping_address) %}
+{% else %}
+{% set shipping_addr = billing_addr %}
+{% endif %}
+
+{# Logic to determine which tax columns to show #}
+{% set show_igst = [] %}
+{% for item in doc.items %}
+{% if item.igst_amount and item.igst_amount > 0 %}
+{% if not show_igst %}{% set _ = show_igst.append(1) %}{% endif %}
+{% endif %}
+{% endfor %}
+{% set ns = namespace(show_purchase_no=false) %}
+{% for item in doc.items %}
+{% if item.custom_purchase_no %}
+{% set ns.show_purchase_no = true %}
+{% endif %}
+{% endfor %}
+
+<div class="outside-label">{{ doc.doctype | upper }}</div>
+<div class="header-box">
+    <table width="100%" style="border: none;">
+        <tr>
+            <td width="60%" valign="top" style="border: none;">
+                <div class="bold" style="font-size:18px; text-transform: uppercase;">JAYASHREE SPUN BOND</div>
+                <div class="address-container" style="margin-top:6px;">
+                    <b>Regd : </b> 42, Old Kuyavarpalayam Road , Madurai - 625009.<br>
+                    <b> Factory Address : </b> 3/4A, Nedungulam Main road,<br>
+                    Pottapalayam, Tamil Nadu India - 630611.<br>
+                    <b>Email Id:</b> info@jayashreespunbond.com<br>
+                    <b>Web:</b> www.jayashreespunbond.com<br>
+                    <b>GSTIN :</b> 33AAIFJ4747P2ZS<br>
+                    <b>IEC No. :</b> 3511012970<br>
+                    <b>Phone No:</b> +91 9789578884<br>
+                </div>
+</div>
+</td>
+<td width="40%" valign="top" class="text-right" style="border: none;">
+    {% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") %}
+    {% if company_logo %}<img src="{{ company_logo }}" class="company-logo"><br>{% endif %}
+    <div style="line-height: 1.4; margin-top: 5px;">
+        <b>{{ doc.doctype }} No :</b> {{ doc.name }}<br>
+        <b>Quotation Date :</b> {{ doc.get_formatted("transaction_date") if doc.transaction_date else "" }}<br>
+        <b>Valid Till :</b> {{ doc.get_formatted("valid_till") if doc.valid_till else "" }}<br>
+        <b>Purchase Order No :</b> {{ doc.custom_po_no or "" }}<br>
+        <b>Purchase Order Date :</b> {{ doc.get_formatted("custom_purchase_order_date") if
+        doc.custom_purchase_order_date else "" }}<br>
+    </div>
+</td>
+</tr>
+</table>
+</div>
+
+<table class="border keep-together" width="100%" style="border-top: none;">
+    <tr>
+        <td width="50%" valign="top">
+            <div class="bold">Buyer & Notify Party</div>
+            <div class="bold">{{ doc.customer_name }}</div>
+            <div class="address-container">
+                {% if billing_addr %}
+                {{ billing_addr.address_line1 or "" }}<br>
+                {% if billing_addr.address_line2 %}{{ billing_addr.address_line2 }}<br>{% endif %}
+                {{ billing_addr.city or "" }}{% if billing_addr.state %}, {{ billing_addr.state }}{% endif %} {% if
+                billing_addr.country %}{{ billing_addr.country }}{% endif %} {{ billing_addr.pincode or "" }}<br>
+
+                {%- set final_s_phones = [] -%}
+                {%- if shipping_addr.phone and shipping_addr.phone | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(shipping_addr.phone | trim) -%}
+                {%- endif -%}
+                {%- if shipping_addr.mobile_no and shipping_addr.mobile_no | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(shipping_addr.mobile_no | trim) -%}
+                {%- endif -%}
+                {%- if doc.contact_phone and doc.contact_phone | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(doc.contact_phone | trim) -%}
+                {%- endif -%}
+                {%- if doc.contact_mobile and doc.contact_mobile | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(doc.contact_mobile | trim) -%}
+                {%- endif -%}
+                <b>Phone No:</b> {{ final_s_phones | join(', ') }}<br>
+
+                {%- set b_emails = [] -%}
+                {%- if billing_addr.email_id -%}{%- set _ = b_emails.append(billing_addr.email_id | trim) -%}{%- endif
+                -%}
+                {%- if doc.contact_email and doc.contact_email not in b_emails -%}{%- set _ =
+                b_emails.append(doc.contact_email | trim) -%}{%- endif -%}
+                <b>Email Id:</b> {{ b_emails | join(', ') }}<br>
+                {% endif %}
+            </div>
+        </td>
+
+        <td width="50%" valign="top">
+            <div class="bold">Consignee</div>
+            <div class="bold">{{ doc.customer_name }}</div>
+            <div class="address-container">
+                {% if shipping_addr %}
+                {{ shipping_addr.address_line1 or "" }}<br>
+                {% if shipping_addr.address_line2 %}{{ shipping_addr.address_line2 }}<br>{% endif %}
+                {{ shipping_addr.city or "" }}{% if shipping_addr.state %}, {{ shipping_addr.state }}{% endif %} {% if
+                shipping_addr.country %}{{ shipping_addr.country }}{% endif %} {{ shipping_addr.pincode or "" }}<br>
+
+                {%- set final_s_phones = [] -%}
+                {%- if shipping_addr.phone and shipping_addr.phone | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(shipping_addr.phone | trim) -%}
+                {%- endif -%}
+                {%- if shipping_addr.mobile_no and shipping_addr.mobile_no | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(shipping_addr.mobile_no | trim) -%}
+                {%- endif -%}
+                {%- if doc.contact_phone and doc.contact_phone | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(doc.contact_phone | trim) -%}
+                {%- endif -%}
+                {%- if doc.contact_mobile and doc.contact_mobile | trim not in final_s_phones -%}
+                {%- set _ = final_s_phones.append(doc.contact_mobile | trim) -%}
+                {%- endif -%}
+                <b>Phone No:</b> {{ final_s_phones | join(', ') }}<br>
+
+                {%- set s_emails = [] -%}
+                {%- if shipping_addr.email_id -%}{%- set _ = s_emails.append(shipping_addr.email_id | trim) -%}{%- endif
+                -%}
+                {%- if doc.contact_email and doc.contact_email not in s_emails -%}{%- set _ =
+                s_emails.append(doc.contact_email | trim) -%}{%- endif -%}
+                <b>Email Id:</b> {{ s_emails | join(', ') }}<br>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+</table>
+
+<table class="border mt-10 keep-together" width="100%">
+
+    <tr>
+        <td width="33%"><b>VESSEL</b><br><br> {{ doc.custom_vessel or "" }}</td>
+        <td width="33%"><b>PORT OF LOADING</b><br><br> {{ doc.custom_port_of_loading or "" }}</td>
+        <td width="34%"><b>PORT OF DISCHARGE</b><br><br> {{ doc.custom_port_of_discharge or "" }}</td>
+    </tr>
+    <tr>
+        <td>
+            <b>COUNTRY OF ORIGIN OF GOODS</b><br><br>
+            {{ frappe.db.get_value("Company", doc.company, "country") or "India" }}
+        </td>
+        <td>
+            <b>COUNTRY OF FINAL DESTINATION</b><br><br>
+            {{ shipping_addr.country if shipping_addr else "" }}
+        </td>
+        <td>
+            <b>FINAL DESTINATION</b><br><br>
+            {{ shipping_addr.country if shipping_addr else "" }}
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <b>PAYMENT TERMS</b><br>
+            <div style="margin-top: 5px; font-size: 10px;">
+                {{ (doc.payment_terms_template or "").replace("EXP - ", "") }}
+            </div>
+        </td>
+        <td>
+            <b>INCOTERM</b><br><br>
+            {% set ico_lower = (doc.incoterm or "") | lower %}
+            {% if 'fob' in ico_lower %}
+            FOB, {{ doc.custom_port_of_loading or "" }}
+            {% else %}
+            {{ doc.incoterm or "" }}, {{ doc.custom_port_of_discharge or "" }}
+            {% endif %}
+        </td>
+        <td><b>CONTAINER TYPE</b><br><br> {{ doc.custom_container_type or "" }}</td>
+    </tr>
+</table>
+
+{%- set export_charges = (doc.custom_freight or 0) + (doc.custom_insurance or 0 if 'cfr' not in (doc.incoterm or '')|lower else 0) -%}
+{%- set grand_total_export = (doc.net_total or 0) + export_charges -%}
+<table class="border mt-20" width="100%">
+    <thead>
+        <tr class="bold text-center" style="background-color: #f2f2f2;">
+            <th width="4%">No</th>
+            {% if ns.show_purchase_no %}
+            <th width="15%">Article</th>
+            {% endif %}
+            <th width="16%">Item</th>
+            <th width="8%">HSN</th>
+            <th width="8%">Qty (Kgs)</th>
+            <th width="8%">No of <br>Rolls</th>
+            <th width="8%">Length/<br>Roll<br>(Mtrs)</th>
+
+            {% set show_fob_label = (export_charges > 0) or ('fob' in (doc.incoterm or '')|lower) %}
+            <th width="10%">Unit Price <br>({% if show_fob_label %}FOB{% else %}{{ doc.incoterm or "Rate" }}{% endif %})</th>
+            <th width="11%">Total <br>({% if show_fob_label %}FOB{% else %}{{ doc.incoterm or "Total" }}{% endif %})</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in doc.items %}
+        <tr>
+            <td class="text-center">{{ loop.index }}</td>
+            {% if ns.show_purchase_no %}
+            <td class="text-center">{{ item.custom_purchase_no or "" }}</td>
+            {% endif %}
+            <td style="text-align: left;">
+                <div class="bold">{{ item.item_code }}</div>
+                <div style="font-size: 10px; color: #333;">{{ item.item_name }}</div>
+            </td>
+            <td class="text-center">{{ item.gst_hsn_code or "" }}</td>
+            <td class="text-center">{{ item.qty }}</td>
+            <td class="text-center">{{ item.custom_no_of_rolls or "" }}</td>
+            <td class="text-center">{{ item.custom_meter_per_roll or "" }}</td>
+            <td class="text-right">$ {{ "{:,.2f}".format(item.rate) }}</td>
+            <td class="text-right bold">$ {{ "{:,.2f}".format(item.amount) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<table width="100%" class="mt-20 keep-together">
+    <tr>
+        <td width="55%" valign="top">
+            <table class="border" width="100%">
+                <tr>
+                    <td class="bold" style="background:#f2f2f2;"> COMPANY BANK DETAILS </td>
+                </tr>
+                <tr>
+                    <td><b>Bank Name:</b> HDFC Bank Limited<br>
+                        <b>Branch & Swift Code:</b> Madurai II | HDFCINBBXXX<br>
+                        <b>A/c No:</b> 50200071975597 (USD A/C)<br>
+                </tr>
+            </table>
+        </td>
+        <td width="45%" valign="top" style="padding-left: 10px;">
+            <table class="border" width="100%">
+                {% set ico_lower = (doc.incoterm or "") | lower %}
+
+                {% if 'fob' in ico_lower %}
+                <tr class="bold" style="background:#f2f2f2;">
+                    <td>FOB, {{ doc.custom_port_of_loading or "" }}</td>
+                    <td class="text-right">{{ doc.get_formatted("grand_total") }}</td>
+                </tr>
+                {% else %}
+                {% if export_charges > 0 %}
+                <tr>
+                    <td>FOB, {{ doc.custom_port_of_loading or "" }}</td>
+                    <td class="text-right">$ {{ "{:,.2f}".format(doc.net_total) }}</td>
+                </tr>
+
+                {% if doc.custom_freight %}
+                <tr>
+                    <td>Freight</td>
+                    <td class="text-right">$ {{ "{:,.2f}".format(doc.custom_freight) }}</td>
+                </tr>
+                {% endif %}
+
+                {% if doc.custom_insurance and 'cfr' not in ico_lower %}
+                <tr>
+                    <td>Insurance</td>
+                    <td class="text-right">$ {{ "{:,.2f}".format(doc.custom_insurance) }}</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+
+                <tr class="bold" style="background:#f2f2f2;">
+                    <td>{{ doc.incoterm or "" }}, {{ doc.custom_port_of_discharge or "" }}</td>
+                    <td class="text-right">$ {{ "{:,.2f}".format(grand_total_export) }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<table class="border mt-10 keep-together" width="100%">
+    <tr>
+        <td class="bold" style="background:#f2f2f2;"> Amount in Words </td>
+    </tr>
+    <tr>
+        <td style="text-transform: capitalize;">{{ frappe.utils.money_in_words(grand_total_export, doc.currency) }}</td>
+    </tr>
+</table>
+
+<table class="border mt-10 keep-together" width="100%">
+    <tr>
+        <td class="bold" style="background:#f2f2f2;"> TERMS & CONDITIONS </td>
+    </tr>
+    <tr>
+        <td style="font-size:10px; line-height:1.4;">
+            {% if doc.incoterm %}
+            {% set ico = doc.incoterm | lower %}
+
+            1. EXACT QUANTITY AT ACTUALS DEPENDING UPON STUFFING +/- 15% TOLERANCE.<br>
+            2. COLOR ABBREVIATION 5% TOLERANCE.<br>
+            {% if 'fob' not in ico %}
+            3. FREIGHT INDICATED IN THE PROFORMA IS AN INDICATIVE PRICE ANY REVISION IN THE FREIGHT ABOVE THE INDICATIVE
+            FREIGHT TO THE ACCOUNT OF THE BUYER AND WILL BE INCORPORATED IN THE INVOICE.
+            {% endif %}
+            {% endif %}
+        </td>
+    </tr>
+</table>
+
+<table width="100%" style="margin-top:40px;" class="keep-together">
+    <tr>
+        <td width="33%" align="center" valign="bottom"><b>Created By</b><br>{{ frappe.get_fullname(doc.owner) }}</td>
+        <td width="33%" align="center" valign="bottom"><b>Checked By</b><br>{{ frappe.get_fullname(doc.custom_checked_by
+            or "") }}</td>
+        <td width="33%" align="right">
+            for JAYASHREE SPUN BOND
+            <img src=" "
+                style="height:60px; width:150px; display:block; margin-left:auto; margin-right:0; object-fit:contain; object-position:right;">
+            <b>Authorised Signatory</b>
+        </td>
+    </tr>
+</table>
+
+<div class="keep-together" style="text-align: center; font-weight: bold; margin-top: 30px;">
+    SUBJECT TO MADURAI JURISDICTION<br>
+    This is a Computer Generated {{ doc.doctype }}
+</div>
