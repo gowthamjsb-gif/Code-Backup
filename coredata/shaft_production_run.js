@@ -12,6 +12,17 @@ var _core_agg_running = false;   // re-entrancy guard
 var CORE_CACHE = {};
 var CORE_CACHE_FULL = {};
 
+const BAG_MAKING_MACHINES = [
+    'VTP-L1 LEADER OYANG MACHINE',
+    'VTP-L2 LEADER ZX MACHINE',
+    'JVE-L3 B700 BAG MAKING MACHINE',
+    'JVE-L2 B700 BAG MAKING MACHINE',
+    'JVE-L1 B700 BAG MAKING MACHINE',
+    'TTT- L3 - OYANG C900 BAG MAKING LINE',
+    'TTT- L2 - OYANG C700 BAG MAKING LINE',
+    'TTT- L1 - OYANG C700 BAG MAKING LINE'
+];
+
 // Clean inch symbols strictly
 function clean_inch(val) {
     return (val || "").toString().replace(/[^\d.]/g, "");
@@ -52,6 +63,73 @@ function get_core_name_for_width(width) {
 
     // Strict fallback: If cache fails, use exact bracket exact name (which has an inch quote)
     return CORE_CACHE[bracket] || CORE_CACHE[width.toString()] || (bracket + '"');
+}
+
+function show_bag_packing_dialog(frm, packing_type) {
+    let title = packing_type === 'Box Packing' ? 'Calculate Box' : 'Calculate Bora';
+    let item_prefix = packing_type === 'Box Packing' ? 'cs - 2005' : 'bb - 1006';
+    let weight_field = packing_type === 'Box Packing' ? 'custom_box_weight_kgs' : 'custom_bora_weight_kgs';
+
+    let d = new frappe.ui.Dialog({
+        title: title,
+        fields: [
+            {
+                label: 'Item',
+                fieldname: 'item',
+                fieldtype: 'Link',
+                options: 'Item',
+                reqd: 1,
+                get_query: function() {
+                    return {
+                        filters: [
+                            ['name', 'like', item_prefix + '%']
+                        ]
+                    };
+                }
+            },
+            {
+                label: 'Weight Per Piece (Kgs)',
+                fieldname: 'weight_per_piece',
+                fieldtype: 'Float',
+                reqd: 1
+            }
+        ],
+        primary_action_label: 'Apply',  
+        primary_action(values) {
+            let weight = flt(values.weight_per_piece);
+            let selected_item = values.item;
+            
+            if (packing_type === 'Box Packing') frm.__box_weight = weight;
+            else frm.__bora_weight_bag = weight;
+
+            let row_count = 0;
+            if (frm.doc.items && frm.doc.items.length > 0) {
+                row_count = frm.doc.items.length;
+                frm.doc.items.forEach(row => {
+                    frappe.model.set_value(row.doctype, row.name, weight_field, weight);
+                });
+                frm.refresh_field("items");
+            }
+            
+            let total_qty = weight * row_count;
+            
+            frappe.db.get_value('Item', selected_item, 'stock_uom', function(r) {
+                let uom = r && r.message ? r.message.stock_uom : 'Nos';
+                
+                frm.doc.bag_packing_details = [];
+                
+                let child = frappe.model.add_child(frm.doc, "Bag Packing Detail", "bag_packing_details");
+                child.item = selected_item;
+                child.quantity_kgs = total_qty;
+                child.uom = uom;
+                
+                frm.refresh_field("bag_packing_details");
+            });
+
+            d.hide();
+        }
+    });
+    d.show();
 }
 
 function show_jve_packing_dialog(frm) {
@@ -109,6 +187,23 @@ frappe.ui.form.on("Shaft Production Run", {
             });
         }
 
+        if (BAG_MAKING_MACHINES.includes(frm.doc.custom_unit) && frm.doc.production_plan && frm.doc.docstatus === 0) {
+            frappe.db.get_value("Production Plan", frm.doc.production_plan, "custom_packing", function(r) {
+                if (r && r.message && r.message.custom_packing) {
+                    let packing_type = r.message.custom_packing;
+                    if (packing_type === 'Box Packing') {
+                        frm.add_custom_button(__('Calculate Box'), function() {
+                            show_bag_packing_dialog(frm, 'Box Packing');
+                        });
+                    } else if (packing_type === 'Bora Packing') {
+                        frm.add_custom_button(__('Calculate Bora'), function() {
+                            show_bag_packing_dialog(frm, 'Bora Packing');
+                        });
+                    }
+                }
+            });
+        }
+
         load_core_cache(function() {
             // Auto-fill custom_core_width_mm for rows that already have width_inch but no core width set
             if (frm.doc.items && frm.doc.items.length) {
@@ -131,6 +226,14 @@ frappe.ui.form.on("Shaft Production Run", {
         if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' && frm.__bora_weight) {
             frappe.model.set_value(cdt, cdn, 'custom_polybag_kgs', frm.__bora_weight);
         }
+        if (BAG_MAKING_MACHINES.includes(frm.doc.custom_unit)) {
+            if (frm.__box_weight) {
+                frappe.model.set_value(cdt, cdn, 'custom_box_weight_kgs', frm.__box_weight);
+            }
+            if (frm.__bora_weight_bag) {
+                frappe.model.set_value(cdt, cdn, 'custom_bora_weight_kgs', frm.__bora_weight_bag);
+            }
+        }
     }
 });
 
@@ -139,6 +242,14 @@ frappe.ui.form.on("Shaft Production Run Item", {
         var row = frappe.get_doc(cdt, cdn);
         if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' && frm.__bora_weight && !flt(row.custom_polybag_kgs)) {
             frappe.model.set_value(cdt, cdn, 'custom_polybag_kgs', frm.__bora_weight);
+        }
+        if (BAG_MAKING_MACHINES.includes(frm.doc.custom_unit)) {
+            if (frm.__box_weight && !flt(row.custom_box_weight_kgs)) {
+                frappe.model.set_value(cdt, cdn, 'custom_box_weight_kgs', frm.__box_weight);
+            }
+            if (frm.__bora_weight_bag && !flt(row.custom_bora_weight_kgs)) {
+                frappe.model.set_value(cdt, cdn, 'custom_bora_weight_kgs', frm.__bora_weight_bag);
+            }
         }
         console.log("CORE DEBUG: width_inch trigger fired for row " + row.idx + "! Value is: " + row.width_inch);
         var target = get_core_name_for_width(flt(row.width_inch));
@@ -153,7 +264,9 @@ frappe.ui.form.on("Shaft Production Run Item", {
     },
     gross_weight: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); },
     custom_core_width_mm: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); },
-    custom_polybag_kgs: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); }
+    custom_polybag_kgs: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); },
+    custom_box_weight_kgs: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); },
+    custom_bora_weight_kgs: function(frm, cdt, cdn) { calculate_net_weight(frm, cdt, cdn); }
 });
 
 function calculate_net_weight(frm, cdt, cdn) {
@@ -161,7 +274,7 @@ function calculate_net_weight(frm, cdt, cdn) {
     var width = flt(row.width_inch);
     
     if (flt(row.gross_weight) <= 0) return;
-    if (frm.doc.custom_unit !== 'JVE - SHEET CUTTING MACHINE' && width <= 0) return;
+    if (frm.doc.custom_unit !== 'JVE - SHEET CUTTING MACHINE' && !BAG_MAKING_MACHINES.includes(frm.doc.custom_unit) && width <= 0) return;
 
     var core_id = row.custom_core_width_mm;
     var cached_core = CORE_CACHE_FULL[core_id];
@@ -184,12 +297,14 @@ function calculate_net_weight(frm, cdt, cdn) {
         }
 
         var core_weight = width * (base_weight / base_inch);
-        if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE') {
+        if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' || BAG_MAKING_MACHINES.includes(frm.doc.custom_unit)) {
             core_weight = 0;
         }
 
         var polybag_weight = flt(row.custom_polybag_kgs) || 0;
-        var calculated_net_weight = flt(flt(row.gross_weight) - core_weight - polybag_weight, 2);
+        var box_weight = flt(row.custom_box_weight_kgs) || 0;
+        var bora_weight = flt(row.custom_bora_weight_kgs) || 0;
+        var calculated_net_weight = flt(flt(row.gross_weight) - core_weight - polybag_weight - box_weight - bora_weight, 2);
         
         if (flt(row.net_weight, 2) !== calculated_net_weight) {
             frappe.model.set_value(cdt, cdn, "net_weight", calculated_net_weight);
@@ -216,7 +331,7 @@ function calculate_net_weight(frm, cdt, cdn) {
 function calculate_aggregate_totals(frm) {
     if (!frm.doc.items) return;
 
-    if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE') {
+    if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' || BAG_MAKING_MACHINES.includes(frm.doc.custom_unit)) {
         if (frm.doc.custom_core_details && frm.doc.custom_core_details.length > 0) {
             frm.doc.custom_core_details.forEach(function(r) {
                 frappe.model.get_doc(r.doctype, r.name).parent = "";
