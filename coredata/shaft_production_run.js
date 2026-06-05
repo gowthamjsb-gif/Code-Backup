@@ -180,6 +180,10 @@ function show_jve_packing_dialog(frm) {
 frappe.ui.form.on("Shaft Production Run", {
     refresh: function(frm) {
         console.log("CORE DEBUG: Form Refresh triggered.");
+        console.log("PACKING DEBUG: custom_unit =", frm.doc.custom_unit);
+        console.log("PACKING DEBUG: production_plan field =", frm.doc.production_plan);
+        console.log("PACKING DEBUG: ALL doc fields =", Object.keys(frm.doc).filter(k => k.toLowerCase().includes("plan") || k.toLowerCase().includes("prod")));
+        console.log("PACKING DEBUG: Is Bag Machine?", BAG_MAKING_MACHINES.includes(frm.doc.custom_unit));
 
         if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' && frm.doc.docstatus === 0) {
             frm.add_custom_button(__('Bora Weight'), function() {
