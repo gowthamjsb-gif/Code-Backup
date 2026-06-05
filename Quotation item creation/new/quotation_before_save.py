@@ -1,6 +1,6 @@
 # Wrapped in run_all(doc) to solve RestrictedPython NameError scoping issue
 def run_all(doc):
-                    def ensure_lh_bopp_item_and_bom(doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, hsn, loop_type_raw):
+                    def ensure_lh_bopp_item_and_bom(doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, hsn, loop_type_raw):
                         is_metallic = "METTALIC" in loop_type_raw
         
                         lam_raw = str(row.get("custom_lh_lamination_gsm") or "0").strip()
@@ -5891,7 +5891,7 @@ def run_all(doc):
                                     loop_width_m = loop_width_mm / 1000.0
                                     if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                         loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                            doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
+                                            doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                         )
                                         loop_fabric_item_code = loop_result_tuple[0]
                                         loop_fabric_bom_no = loop_result_tuple[1]
@@ -6345,7 +6345,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
+                                        doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
@@ -7528,7 +7528,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
+                                        doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
@@ -8279,7 +8279,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
+                                        doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
@@ -12693,6 +12693,19 @@ def run_all(doc):
                                         row.custom_sheet_cut_length_mm = sheet_cut_length_mm_bag
                                     row.custom_weight_per_bag_grams = weight_grams_bag
                                     row.custom_no_of_sheets_pcs = None
+                                    # Also set raw bag dimensions so create_plain_box_bag_boms can read them
+                                    if w_mm_bag > 0:
+                                        row.custom_width_mm = w_mm_bag
+                                        row.custom_width_inch = round(w_mm_bag / 25.4, 1)
+                                        row.custom_width_cm = round(w_mm_bag / 10, 2)
+                                    if h_mm_bag > 0:
+                                        row.custom_height_mm = h_mm_bag
+                                        row.custom_height_inches = round(h_mm_bag / 25.4, 1)
+                                        row.custom_height_cm = round(h_mm_bag / 10, 2)
+                                    if g_mm_bag > 0:
+                                        row.custom_gazette_mm = g_mm_bag
+                                        row.custom_gazette_inch = round(g_mm_bag / 25.4, 1)
+                                        row.custom_gazette_cm = round(g_mm_bag / 10, 2)
                                 except Exception:
                                     pass
 

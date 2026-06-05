@@ -1034,22 +1034,38 @@
                 .catch(() => null);
         }
 
-        return loadByKey(linkKey)
-            .then(msg => {
-                if (msg) return applyMaster(msg);
-                return loadByKey(nameKey).then(msg2 => {
-                    if (msg2) return applyMaster(msg2);
-                    if (/^\d+$/.test(linkKey)) {
-                        return frappe.db.get_value(
-                            "DESIGN MASTER",
-                            { design_code: linkKey },
-                            masterFields
-                        ).then(r => {
-                            if (r && r.message && r.message.name) return applyMaster(r.message);
-                        }).catch(() => { });
-                    }
+        // If linkKey (design_code) is provided, use it first
+        if (linkKey) {
+            // If numeric, go straight to design_code filter (most reliable)
+            if (/^\d+$/.test(linkKey)) {
+                return frappe.db.get_value(
+                    "DESIGN MASTER",
+                    { design_code: linkKey },
+                    masterFields
+                ).then(r => {
+                    if (r && r.message && r.message.name) return applyMaster(r.message);
+                    // fallback: try direct name lookup with linkKey
+                    return loadByKey(linkKey).then(msg => {
+                        if (msg) return applyMaster(msg);
+                    }).catch(() => { });
+                }).catch(() => {
+                    return loadByKey(linkKey).then(msg => {
+                        if (msg) return applyMaster(msg);
+                    }).catch(() => { });
                 });
+            }
+            // Non-numeric linkKey: try direct name lookup
+            return loadByKey(linkKey).then(msg => {
+                if (msg) return applyMaster(msg);
             });
+        }
+        // No linkKey — use nameKey only
+        if (nameKey) {
+            return loadByKey(nameKey).then(msg => {
+                if (msg) return applyMaster(msg);
+            });
+        }
+        return Promise.resolve();
     }
 
     function applyBagRowDesignDefaults(frm, cdt, cdn) {

@@ -12369,6 +12369,19 @@ def run_all(doc):
                                         row.custom_sheet_cut_length_mm = sheet_cut_length_mm_bag
                                     row.custom_weight_per_bag_grams = weight_grams_bag
                                     row.custom_no_of_sheets_pcs = None
+                                    # Also set raw bag dimensions so create_plain_box_bag_boms can read them
+                                    if w_mm_bag > 0:
+                                        row.custom_width_mm = w_mm_bag
+                                        row.custom_width_inch = round(w_mm_bag / 25.4, 1)
+                                        row.custom_width_cm = round(w_mm_bag / 10, 2)
+                                    if h_mm_bag > 0:
+                                        row.custom_height_mm = h_mm_bag
+                                        row.custom_height_inches = round(h_mm_bag / 25.4, 1)
+                                        row.custom_height_cm = round(h_mm_bag / 10, 2)
+                                    if g_mm_bag > 0:
+                                        row.custom_gazette_mm = g_mm_bag
+                                        row.custom_gazette_inch = round(g_mm_bag / 25.4, 1)
+                                        row.custom_gazette_cm = round(g_mm_bag / 10, 2)
                                 except Exception:
                                     pass
 
