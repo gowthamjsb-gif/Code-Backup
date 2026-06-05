@@ -221,7 +221,17 @@ def run_all(doc):
 
                                 l_bom.append("items", {"item_code": fabric_item_code, "qty": base_fab_qty, "uom": "Kg", "do_not_explode": 1})
                                 l_bom.append("items", {"item_code": printed_bopp_item_code, "qty": ratio_bopp, "uom": "Kg", "do_not_explode": 1})
-                                l_bom.append("items", {"item_code": "PP LAMINATION GRANULES", "qty": ratio_lam, "uom": "Kg"})
+                                lam_granules_item = "PP LAMINATION GRANULES"
+                                if not frappe.db.exists("Item", lam_granules_item):
+                                    # Try common alternate names
+                                    for alt in ("PP Lamination Granules", "PP-LAM-GRAN", "LAM GRANULES"):
+                                        if frappe.db.exists("Item", alt):
+                                            lam_granules_item = alt
+                                            break
+                                    else:
+                                        lam_granules_item = None
+                                if lam_granules_item and ratio_lam > 0:
+                                    l_bom.append("items", {"item_code": lam_granules_item, "qty": ratio_lam, "uom": "Kg"})
 
                                 if scrap_qty > 0 and frappe.db.exists("Item", "SCRAP-NONWOVEN"):
                                     l_bom.append("scrap_items", {"item_code": "SCRAP-NONWOVEN", "qty": scrap_qty})
