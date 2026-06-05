@@ -116,14 +116,14 @@ function show_bag_packing_dialog(frm, packing_type) {
             frappe.db.get_value('Item', selected_item, 'stock_uom', function(r) {
                 let uom = (r && r.stock_uom) ? r.stock_uom : ((r && r.message && r.message.stock_uom) ? r.message.stock_uom : 'Nos');
                 
-                frappe.model.clear_table(frm.doc, "bag_packing_details");
+                frappe.model.clear_table(frm.doc, "custom_bag_packing_details");
                 
-                let child = frappe.model.add_child(frm.doc, "Bag Packing Detail", "bag_packing_details");
+                let child = frappe.model.add_child(frm.doc, "Bag Packing Detail", "custom_bag_packing_details");
                 child.item = selected_item;
                 child.quantity_kgs = total_qty;
                 child.uom = uom;
                 
-                frm.refresh_field("bag_packing_details");
+                frm.refresh_field("custom_bag_packing_details");
             });
 
             d.hide();
