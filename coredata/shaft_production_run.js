@@ -179,11 +179,6 @@ function show_jve_packing_dialog(frm) {
 
 frappe.ui.form.on("Shaft Production Run", {
     refresh: function(frm) {
-        console.log("CORE DEBUG: Form Refresh triggered.");
-        console.log("PACKING DEBUG: custom_unit =", frm.doc.custom_unit);
-        console.log("PACKING DEBUG: production_plan field =", frm.doc.production_plan);
-        console.log("PACKING DEBUG: ALL doc fields =", Object.keys(frm.doc).filter(k => k.toLowerCase().includes("plan") || k.toLowerCase().includes("prod")));
-        console.log("PACKING DEBUG: Is Bag Machine?", BAG_MAKING_MACHINES.includes(frm.doc.custom_unit));
 
         if (frm.doc.custom_unit === 'JVE - SHEET CUTTING MACHINE' && frm.doc.docstatus === 0) {
             frm.add_custom_button(__('Bora Weight'), function() {
@@ -193,24 +188,15 @@ frappe.ui.form.on("Shaft Production Run", {
 
         if (BAG_MAKING_MACHINES.includes(frm.doc.custom_unit) && frm.doc.production_plan && frm.doc.docstatus === 0) {
             frappe.db.get_value("Production Plan", frm.doc.production_plan, "custom_packing", function(r) {
-                console.log("PACKING DEBUG: get_value response =", r);
-                console.log("PACKING DEBUG: custom_packing value =", r && r.message ? JSON.stringify(r.message) : "NO MESSAGE");
-                if (r && r.message && r.message.custom_packing) {
-                    let packing_type = r.message.custom_packing;
-                    console.log("PACKING DEBUG: packing_type =", packing_type);
-                    if (packing_type === 'Box Packing') {
-                        frm.add_custom_button(__('Calculate Box'), function() {
-                            show_bag_packing_dialog(frm, 'Box Packing');
-                        });
-                    } else if (packing_type === 'Bora Packing') {
-                        frm.add_custom_button(__('Calculate Bora'), function() {
-                            show_bag_packing_dialog(frm, 'Bora Packing');
-                        });
-                    } else {
-                        console.log("PACKING DEBUG: packing_type did NOT match Box or Bora. Got:", JSON.stringify(packing_type));
-                    }
-                } else {
-                    console.log("PACKING DEBUG: No custom_packing value found in Production Plan response.");
+                let packing_type = r && r.custom_packing ? r.custom_packing : null;
+                if (packing_type === 'Box Packing') {
+                    frm.add_custom_button(__('Calculate Box'), function() {
+                        show_bag_packing_dialog(frm, 'Box Packing');
+                    });
+                } else if (packing_type === 'Bora Packing') {
+                    frm.add_custom_button(__('Calculate Bora'), function() {
+                        show_bag_packing_dialog(frm, 'Bora Packing');
+                    });
                 }
             });
         }
