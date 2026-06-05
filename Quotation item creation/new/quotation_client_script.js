@@ -1274,17 +1274,9 @@
             ? Math.round((1000 / (gsm * sheetWidthM)) * 100) / 100
             : 0;
         
-        const p = (row.custom_process || row.process || "").trim().toUpperCase();
-        const isLaminated = p.includes("LAMINATED");
-        const isPrinted = p.includes("PRINTED");
-        let weightGrams = 0;
-        if (isLaminated && !isPrinted) {
-            weightGrams = Math.round(((gsm * sheetWidthM * cutLengthM) + 3.5) * 1000) / 1000;
-        } else {
-            const wIn = parseFloat(row.custom_width_inch) || (wMm / 25.4);
-            const hIn = parseFloat(row.custom_height_inches) || (hMm / 25.4);
-            weightGrams = Math.round(((((hIn + 2) * 2) * gsm * wIn * 0.85) / 1550.0) * 1000) / 1000;
-        }
+        const wIn = parseFloat(row.custom_width_inch) || (wMm / 25.4);
+        const hIn = parseFloat(row.custom_height_inches) || (hMm / 25.4);
+        const weightGrams = Math.round(((((wIn * 2) + 2) * gsm * hIn * 0.85) / 1550.0) * 1000) / 1000;
         const weightKg = Math.floor((weightGrams / 1000) * 1000) / 1000;
         return { sheetWidthMm, sheetCutLengthMm, cutLengthM, metersPerKg, weightGrams, weightKg };
     }
