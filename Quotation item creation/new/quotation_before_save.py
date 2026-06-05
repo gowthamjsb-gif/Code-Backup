@@ -1,5 +1,278 @@
 # Wrapped in run_all(doc) to solve RestrictedPython NameError scoping issue
 def run_all(doc):
+                    def ensure_lh_bopp_item_and_bom(doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, hsn, loop_type_raw):
+                        is_metallic = "METTALIC" in loop_type_raw
+        
+                        lam_raw = str(row.get("custom_lh_lamination_gsm") or "0").strip()
+                        lam_digits = "".join(ch for ch in lam_raw if ch.isdigit())
+                        lam_num = int(lam_digits) if lam_digits else 0
+        
+                        bopp_raw = str(row.get("custom_lh_bopp_gsm") or "0").strip()
+                        bopp_digits = "".join(ch for ch in bopp_raw if ch.isdigit())
+                        bopp_num = int(bopp_digits) if bopp_digits else 0
+        
+                        f_gsm = int(float(row.get("custom_lh_fabric_gsm") or 0))
+                        if f_gsm <= 0:
+                            f_gsm = int(float(row.get("custom_loop_handle_gsm") or 0)) - lam_num - bopp_num
+        
+                        bopp_lam_total_gsm = f_gsm + bopp_num + lam_num
+        
+                        nested_design_code = str(row.get("custom_lh_design_code") or "").strip()
+                        nested_design_name = str(row.get("custom_lh_design_name") or "").strip().upper()
+        
+                        bopp_lam_width = round(loop_width_mm / 25.4, 1)
+        
+                        bopp_quality_code_map = {
+                            "PREMIUM": "A", "PLATINUM": "B", "SUPER PLATINUM": "C",
+                            "GOLD": "D", "SILVER": "E", "BRONZE": "F",
+                            "CLASSIC": "G", "SUPER CLASSIC": "H", "LIFE STYLE": "I",
+                            "LIFESTYLE": "I", "ECO SPECIAL": "J", "ECO GREEN": "K",
+                            "SUPER ECO": "L", "ULTRA": "M", "DELUXE": "N",
+                            "VIRGIN MIX - GOLD MIX": "O", "MID MIX - CLASSIC MIX": "P",
+                            "ECO MIX": "Q", "DELUXE MIX": "R"
+                        }
+                        bopp_q_code = bopp_quality_code_map.get(loop_q, "X")
+                        fabric_gsm_code_map = {
+                            20: "A", 25: "B", 30: "C", 35: "D", 40: "E",
+                            45: "F", 50: "G", 55: "H", 60: "I", 65: "J",
+                            70: "K", 75: "L", 80: "M", 85: "N", 90: "O",
+                            95: "P", 100: "Q", 105: "R", 110: "S", 115: "T", 120: "U"
+                        }
+                        bopp_gsm_code_map = {10: "A", 12: "B", 15: "C", 30: "D", 0: "0"}
+                        lam_gsm_code_map = {10: "A", 12: "B", 15: "C", 30: "D", 20: "E"}
+        
+                        bopp_fab_gsm_code = fabric_gsm_code_map.get(f_gsm, str(f_gsm))
+                        bopp_bopp_gsm_code = bopp_gsm_code_map.get(bopp_num, str(bopp_num))
+                        bopp_lam_gsm_code = lam_gsm_code_map.get(lam_num, str(lam_num))
+        
+                        bopp_finishing_code = "M"
+                        bopp_finish_desc = "MATT FINISH"
+                        bopp_coating_code = "M" if is_metallic else "0"
+        
+                        bopp_lam_mm_code = str(loop_width_mm).zfill(4)
+                        bopp_lam_item_code = (
+                            f"{nested_design_code}-107"
+                            f"{bopp_q_code}{loop_c_code}"
+                            f"{bopp_fab_gsm_code}{bopp_bopp_gsm_code}{bopp_lam_gsm_code}"
+                            f"{bopp_lam_mm_code}"
+                            f"{bopp_coating_code}{bopp_finishing_code}"
+                        )
+                        bopp_lam_item_name = (
+                            f"{nested_design_code} - {nested_design_name} - NON WOVEN BOPP LAMINATED "
+                            f"{bopp_lam_total_gsm} GSM W - {bopp_lam_width}'' ( {loop_width_mm} MM )"
+                        )
+        
+                        if not frappe.db.exists("Item", bopp_lam_item_code):
+                            bopp_lam_item = frappe.new_doc("Item")
+                            bopp_lam_item.item_code = bopp_lam_item_code
+                            bopp_lam_item.item_name = bopp_lam_item_name
+                            bopp_lam_item.item_group = "Products"
+                            bopp_lam_item.stock_uom = "Kg"
+                            bopp_lam_item.has_batch_no = 1
+                            bopp_lam_item.weight_uom = "Kg"
+                            bopp_lam_item.valuation_method = "FIFO"
+                            bopp_lam_item.gst_hsn_code = hsn
+                            bopp_lam_item.append("item_defaults", {
+                                "company": doc.company,
+                                "default_warehouse": selected_company_warehouse
+                            })
+                            bopp_lam_item.insert(ignore_permissions=True)
+        
+                        if f_gsm < 60:
+                            extra_mm = 30
+                        elif 60 <= f_gsm <= 80:
+                            extra_mm = 25
+                        else:
+                            extra_mm = 20
+        
+                        fabric_mm = loop_width_mm + extra_mm
+                        fab_process_code = "100"
+                        fabric_item_code = f"{fab_process_code}{loop_q_code}{loop_c_code}{str(f_gsm).zfill(3)}{str(fabric_mm).zfill(4)}"
+                        fabric_inch = round(fabric_mm / 25.4, 1)
+                        fabric_item_name = f"NON WOVEN FABRIC {loop_q_display} {loop_c_display} {f_gsm} GSM W - {fabric_inch}'' ( {fabric_mm} MM )"
+        
+                        if not frappe.db.exists("Item", fabric_item_code):
+                            fab_hsn = "56031200"
+                            fab_item = frappe.new_doc("Item")
+                            fab_item.item_code = fabric_item_code
+                            fab_item.item_name = fabric_item_name
+                            fab_item.item_group = "Products"
+                            fab_item.stock_uom = "Kg"
+                            fab_item.has_batch_no = 1
+                            fab_item.weight_uom = "Kg"
+                            fab_item.valuation_method = "FIFO"
+                            fab_item.gst_hsn_code = fab_hsn
+                            fab_item.append("item_defaults", {
+                                "company": doc.company,
+                                "default_warehouse": selected_company_warehouse
+                            })
+                            fab_item.insert(ignore_permissions=True)
+        
+                        fabric_bom_no = frappe.db.get_value("BOM", {"item": fabric_item_code, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
+                        if not fabric_bom_no:
+                            fabric_bom_no = frappe.db.get_value("BOM", {"item": fabric_item_code, "is_active": 1, "docstatus": 1}, "name")
+                        if not fabric_bom_no:
+                            try:
+                                fabric_bom = frappe.new_doc("BOM")
+                                fabric_bom.company = doc.company
+                                fabric_bom.item = fabric_item_code
+                                fabric_bom.quantity = 1.0
+                                fabric_bom.is_default = 1
+                                fabric_bom.is_active = 1
+                                fabric_bom.currency = "INR"
+                                fabric_bom.rm_cost_as_per = "Valuation Rate"
+                                pp_item_code = "113100"
+                                if frappe.db.exists("Item", pp_item_code):
+                                    fabric_bom.append("items", {
+                                        "item_code": pp_item_code,
+                                        "qty": 1.0,
+                                        "uom": "Kg",
+                                    })
+                                fabric_bom.insert(ignore_permissions=True)
+                                fabric_bom.submit()
+                                fabric_bom_no = fabric_bom.name
+                            except Exception as e:
+                                frappe.log_error("Fabric BOM Creation Failed", str(e))
+        
+                        color_count_raw = str(row.get("custom_lh_no_of_design_colour") or "1").strip()
+                        color_count = int(color_count_raw.replace("C", "")) if color_count_raw.replace("C", "").isdigit() else 1
+        
+                        c_up = str(row.get("custom_lh_design_colour") or "").strip().upper()
+                        color_desc_part = f"{color_count} COLOUR - {c_up}" if c_up else f"{color_count} COLOUR"
+                        printed_bopp_item_code = f"{nested_design_code}-106{color_count}C{bopp_coating_code}{bopp_finishing_code}"
+                        printed_bopp_item_name = f"{nested_design_code} - {nested_design_name} - PRINTED BOPP FILM - {color_desc_part} - {bopp_finish_desc}"
+        
+                        if not frappe.db.exists("Item", printed_bopp_item_code):
+                            printed_bopp_item = frappe.new_doc("Item")
+                            printed_bopp_item.item_code = printed_bopp_item_code
+                            printed_bopp_item.item_name = printed_bopp_item_name
+                            printed_bopp_item.item_group = "Products"
+                            printed_bopp_item.stock_uom = "Kg"
+                            printed_bopp_item.has_batch_no = 1
+                            printed_bopp_item.weight_uom = "Kg"
+                            printed_bopp_item.valuation_method = "FIFO"
+                            printed_bopp_item.gst_hsn_code = hsn
+                            printed_bopp_item.append("item_defaults", {
+                                "company": doc.company,
+                                "default_warehouse": selected_company_warehouse
+                            })
+                            printed_bopp_item.insert(ignore_permissions=True)
+        
+                        plain_bopp_item_code = f"BOPP-{bopp_num}M-{loop_width_mm}MM-{bopp_coating_code}{bopp_finishing_code}"
+                        plain_bopp_item_name = f"PLAIN BOPP FILM - {bopp_finish_desc} - NON HEAT SEALABLE - 2 SIDE CORONA TREATED - {bopp_num}M - {loop_width_mm} MM"
+                        if not frappe.db.exists("Item", plain_bopp_item_code):
+                            plain_bopp_item = frappe.new_doc("Item")
+                            plain_bopp_item.item_code = plain_bopp_item_code
+                            plain_bopp_item.item_name = plain_bopp_item_name
+                            plain_bopp_item.item_group = "Raw Material"
+                            plain_bopp_item.stock_uom = "Kg"
+                            plain_bopp_item.has_batch_no = 1
+                            plain_bopp_item.weight_uom = "Kg"
+                            plain_bopp_item.valuation_method = "FIFO"
+                            plain_bopp_item.gst_hsn_code = hsn
+                            plain_bopp_item.append("item_defaults", {
+                                "company": doc.company,
+                                "default_warehouse": selected_company_warehouse
+                            })
+                            plain_bopp_item.insert(ignore_permissions=True)
+        
+                        pb_bom_no = frappe.db.get_value("BOM", {"item": printed_bopp_item_code, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
+                        if not pb_bom_no:
+                            pb_bom_no = frappe.db.get_value("BOM", {"item": printed_bopp_item_code, "is_active": 1, "docstatus": 1}, "name")
+                        if not pb_bom_no:
+                            try:
+                                pb_bom = frappe.new_doc("BOM")
+                                pb_bom.item = printed_bopp_item_code
+                                pb_bom.quantity = 1.0
+                                pb_bom.is_default = 1
+                                pb_bom.is_active = 1
+                                pb_bom.currency = "INR"
+                                pb_bom.rm_cost_as_per = "Valuation Rate"
+                                pb_bom.append("items", {"item_code": plain_bopp_item_code, "qty": round(13.6/15.0, 5), "uom": "Kg", "do_not_explode": 1})
+                                if frappe.db.exists("Item", "INK - 007"):
+                                    pb_bom.append("items", {"item_code": "INK - 007", "qty": 0.05, "uom": "Kg"})
+                                pb_bom.insert(ignore_permissions=True)
+                                pb_bom.submit()
+                                pb_bom_no = pb_bom.name
+                            except Exception as e:
+                                frappe.log_error("Printed BOPP BOM Creation Failed", str(e))
+        
+                        bopp_lam_bom_no = frappe.db.get_value("BOM", {"item": bopp_lam_item_code, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
+                        if not bopp_lam_bom_no:
+                            bopp_lam_bom_no = frappe.db.get_value("BOM", {"item": bopp_lam_item_code, "is_active": 1, "docstatus": 1}, "name")
+                        if not bopp_lam_bom_no:
+                            try:
+                                l_bom = frappe.new_doc("BOM")
+                                l_bom.company = doc.company
+                                l_bom.item = bopp_lam_item_code
+                                l_bom.quantity = 1.0
+                                l_bom.is_default = 1
+                                l_bom.is_active = 1
+                                l_bom.currency = "INR"
+                                l_bom.rm_cost_as_per = "Valuation Rate"
+
+                                ratio_bopp = bopp_num / bopp_lam_total_gsm
+                                ratio_fab = f_gsm / bopp_lam_total_gsm
+                                ratio_lam = lam_num / bopp_lam_total_gsm
+
+                                width_ratio = fabric_mm / float(loop_width_mm)
+                                base_fab_qty = ratio_fab * width_ratio
+                                scrap_qty = max(0.0, base_fab_qty - ratio_fab)
+
+                                l_bom.append("items", {"item_code": fabric_item_code, "qty": base_fab_qty, "uom": "Kg", "do_not_explode": 1})
+                                l_bom.append("items", {"item_code": printed_bopp_item_code, "qty": ratio_bopp, "uom": "Kg", "do_not_explode": 1})
+                                l_bom.append("items", {"item_code": "PP LAMINATION GRANULES", "qty": ratio_lam, "uom": "Kg"})
+
+                                if scrap_qty > 0 and frappe.db.exists("Item", "SCRAP-NONWOVEN"):
+                                    l_bom.append("scrap_items", {"item_code": "SCRAP-NONWOVEN", "qty": scrap_qty})
+
+                                l_bom.insert(ignore_permissions=True)
+                                l_bom.submit()
+                                bopp_lam_bom_no = l_bom.name
+                            except Exception as e:
+                                frappe.log_error("Laminated BOPP BOM Creation Failed", str(e))
+        
+                        slitted_process_code = "108"
+                        slitted_item_code = f"{slitted_process_code}{bopp_q_code}{loop_c_code}{bopp_fab_gsm_code}{bopp_bopp_gsm_code}{bopp_lam_gsm_code}{bopp_lam_mm_code}{bopp_coating_code}{bopp_finishing_code}"
+                        slitted_item_name = f"NON WOVEN BOPP LAMINATED SLITTED FABRIC {bopp_lam_total_gsm} GSM W - {bopp_lam_width}'' ( {loop_width_mm} MM )"
+        
+                        if not frappe.db.exists("Item", slitted_item_code):
+                            slitted_item = frappe.new_doc("Item")
+                            slitted_item.item_code = slitted_item_code
+                            slitted_item.item_name = slitted_item_name
+                            slitted_item.item_group = "Products"
+                            slitted_item.stock_uom = "Kg"
+                            slitted_item.has_batch_no = 1
+                            slitted_item.weight_uom = "Kg"
+                            slitted_item.valuation_method = "FIFO"
+                            slitted_item.gst_hsn_code = hsn
+                            slitted_item.append("item_defaults", {
+                                "company": doc.company,
+                                "default_warehouse": selected_company_warehouse
+                            })
+                            slitted_item.insert(ignore_permissions=True)
+        
+                        slitted_bom_no = frappe.db.get_value("BOM", {"item": slitted_item_code, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
+                        if not slitted_bom_no:
+                            slitted_bom_no = frappe.db.get_value("BOM", {"item": slitted_item_code, "is_active": 1, "docstatus": 1}, "name")
+                        if not slitted_bom_no:
+                            try:
+                                s_bom = frappe.new_doc("BOM")
+                                s_bom.company = doc.company
+                                s_bom.item = slitted_item_code
+                                s_bom.quantity = 1.0
+                                s_bom.is_default = 1
+                                s_bom.is_active = 1
+                                s_bom.currency = "INR"
+                                s_bom.rm_cost_as_per = "Valuation Rate"
+                                s_bom.append("items", {"item_code": bopp_lam_item_code, "qty": 1.0, "uom": "Kg", "do_not_explode": 1})
+                                s_bom.insert(ignore_permissions=True)
+                                s_bom.submit()
+                                slitted_bom_no = s_bom.name
+                            except Exception as e:
+                                frappe.log_error("Slitted BOPP BOM Creation Failed", str(e))
+        
+                        return slitted_item_code, slitted_bom_no, bopp_lam_total_gsm
                     # ==========================================================
                     # 1. INITIALIZATION & DYNAMIC CONFIGURATION
                     # ==========================================================
@@ -5565,9 +5838,9 @@ def run_all(doc):
                             loop_fabric_item_code = None
                             loop_fabric_bom_no = None
                             loop_handle_qty_m = 0.82
-                            loop_type_raw = str(row.get("custom_loop_handle_type") or "").strip().upper()
+                            loop_type_raw = str(row.get("custom_lh_process") or "").strip().upper()
                             use_loop_handle = False
-                            if loop_type_raw and "BOPP" not in loop_type_raw:
+                            if loop_type_raw:
                                 if "NON WOVEN" in loop_type_raw or "NONWOVEN" in loop_type_raw.replace(" ", ""):
                                     use_loop_handle = True
                             if use_loop_handle:
@@ -5616,7 +5889,16 @@ def run_all(doc):
                                         loop_c_display = loop_c.strip()
                                     loop_width_mm = int(5 * round(loop_w_in * 25.4 / 5.0))
                                     loop_width_m = loop_width_mm / 1000.0
-                                    if loop_width_m > 0:
+                                    if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
+                                        loop_fabric_item_code, loop_fabric_bom_no, loop_bopp_total_gsm = ensure_lh_bopp_item_and_bom(
+                                            doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, getattr(doc, "hsn", ""), loop_type_raw
+                                        )
+                                        if loop_fabric_item_code:
+                                            loop_meters_per_kg = round(1000.0 / (loop_bopp_total_gsm * loop_width_m), 2)
+                                            try:
+                                                frappe.db.set_value("Item", loop_fabric_item_code, "custom_meters_per_kg", loop_meters_per_kg)
+                                            except Exception: pass
+                                    elif loop_width_m > 0:
                                         loop_meters_per_kg = round(1000.0 / (loop_gsm_int * loop_width_m), 2)
                                         loop_fabric_mm_code = str(loop_width_mm).zfill(4)
                                         loop_base_width_mm = 1020
@@ -6006,9 +6288,9 @@ def run_all(doc):
                         loop_fabric_item_code = None
                         loop_fabric_bom_no = None
                         loop_handle_qty_m = 0.82
-                        loop_type_raw = str(row.get("custom_loop_handle_type") or "").strip().upper()
+                        loop_type_raw = str(row.get("custom_lh_process") or "").strip().upper()
                         use_loop_handle = False
-                        if not is_d_cut and loop_type_raw and "BOPP" not in loop_type_raw:
+                        if not is_d_cut and loop_type_raw:
                             if "NON WOVEN" in loop_type_raw or "NONWOVEN" in loop_type_raw.replace(" ", ""):
                                 use_loop_handle = True
                         if use_loop_handle:
@@ -6058,7 +6340,16 @@ def run_all(doc):
                                     loop_c_display = loop_c.strip()
                                 loop_width_mm = int(5 * round(loop_w_in * 25.4 / 5.0))
                                 loop_width_m = loop_width_mm / 1000.0
-                                if loop_width_m > 0:
+                                if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
+                                    loop_fabric_item_code, loop_fabric_bom_no, loop_bopp_total_gsm = ensure_lh_bopp_item_and_bom(
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, getattr(doc, "hsn", ""), loop_type_raw
+                                    )
+                                    if loop_fabric_item_code:
+                                        loop_meters_per_kg = round(1000.0 / (loop_bopp_total_gsm * loop_width_m), 2)
+                                        try:
+                                            frappe.db.set_value("Item", loop_fabric_item_code, "custom_meters_per_kg", loop_meters_per_kg)
+                                        except Exception: pass
+                                elif loop_width_m > 0:
                                     loop_meters_per_kg = round(1000.0 / (loop_gsm_int * loop_width_m), 2)
                                     loop_fabric_mm_code = str(loop_width_mm).zfill(4)
                                     loop_base_width_mm = 1020
@@ -7178,9 +7469,9 @@ def run_all(doc):
                         loop_fabric_item_code = None
                         loop_fabric_bom_no = None
                         loop_handle_qty_m = 0.82
-                        loop_type_raw = str(row.get("custom_loop_handle_type") or "").strip().upper()
+                        loop_type_raw = str(row.get("custom_lh_process") or "").strip().upper()
                         use_loop_handle = False
-                        if not is_d_cut_sheet_bag and not is_w_cut_bag_sheet and loop_type_raw and "BOPP" not in loop_type_raw:
+                        if not is_d_cut_sheet_bag and not is_w_cut_bag_sheet and loop_type_raw:
                             if "NON WOVEN" in loop_type_raw or "NONWOVEN" in loop_type_raw.replace(" ", ""):
                                 use_loop_handle = True
                         if use_loop_handle:
@@ -7229,7 +7520,16 @@ def run_all(doc):
                                     loop_c_display = loop_c.strip()
                                 loop_width_mm = int(5 * round(loop_w_in * 25.4 / 5.0))
                                 loop_width_m = loop_width_mm / 1000.0
-                                if loop_width_m > 0:
+                                if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
+                                    loop_fabric_item_code, loop_fabric_bom_no, loop_bopp_total_gsm = ensure_lh_bopp_item_and_bom(
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, getattr(doc, "hsn", ""), loop_type_raw
+                                    )
+                                    if loop_fabric_item_code:
+                                        loop_meters_per_kg = round(1000.0 / (loop_bopp_total_gsm * loop_width_m), 2)
+                                        try:
+                                            frappe.db.set_value("Item", loop_fabric_item_code, "custom_meters_per_kg", loop_meters_per_kg)
+                                        except Exception: pass
+                                elif loop_width_m > 0:
                                     loop_meters_per_kg = round(1000.0 / (loop_gsm_int * loop_width_m), 2)
                                     loop_fabric_mm_code = str(loop_width_mm).zfill(4)
                                     loop_base_width_mm = 1020
@@ -7916,9 +8216,9 @@ def run_all(doc):
                         loop_fabric_item_code = None
                         loop_fabric_bom_no = None
                         loop_handle_qty_m = 0.82
-                        loop_type_raw = str(row.get("custom_loop_handle_type") or "").strip().upper()
+                        loop_type_raw = str(row.get("custom_lh_process") or "").strip().upper()
                         use_loop_handle = False
-                        if loop_type_raw and "BOPP" not in loop_type_raw:
+                        if loop_type_raw:
                             if "NON WOVEN" in loop_type_raw or "NONWOVEN" in loop_type_raw.replace(" ", ""):
                                 use_loop_handle = True
                         if use_loop_handle:
@@ -7968,7 +8268,16 @@ def run_all(doc):
                                     loop_c_display = loop_c.strip()
                                 loop_width_mm = int(5 * round(loop_w_in * 25.4 / 5.0))
                                 loop_width_m = loop_width_mm / 1000.0
-                                if loop_width_m > 0:
+                                if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
+                                    loop_fabric_item_code, loop_fabric_bom_no, loop_bopp_total_gsm = ensure_lh_bopp_item_and_bom(
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, getattr(doc, "hsn", ""), loop_type_raw
+                                    )
+                                    if loop_fabric_item_code:
+                                        loop_meters_per_kg = round(1000.0 / (loop_bopp_total_gsm * loop_width_m), 2)
+                                        try:
+                                            frappe.db.set_value("Item", loop_fabric_item_code, "custom_meters_per_kg", loop_meters_per_kg)
+                                        except Exception: pass
+                                elif loop_width_m > 0:
                                     loop_meters_per_kg = round(1000.0 / (loop_gsm_int * loop_width_m), 2)
                                     loop_fabric_mm_code = str(loop_width_mm).zfill(4)
                                     loop_base_width_mm = 1020
@@ -13429,8 +13738,8 @@ def run_all(doc):
 
                             if is_any_box_bag and not should_run_bom_creation:
                                 try:
-                                    loop_type_chk = str(row.get("custom_loop_handle_type") or "").strip().upper()
-                                    if loop_type_chk and "BOPP" not in loop_type_chk and "NON WOVEN" in loop_type_chk:
+                                    loop_type_chk = str(row.get("custom_lh_process") or "").strip().upper()
+                                    if loop_type_chk and "NON WOVEN" in loop_type_chk:
                                         loop_q_chk = str(row.get("custom_loop_handle_quality") or "").strip().upper()
                                         loop_c_chk = str(row.get("custom_loop_handle_colour") or "").strip().upper()
                                         if loop_c_chk == "WHITE":

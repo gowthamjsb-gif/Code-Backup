@@ -1459,14 +1459,52 @@
         // Always try to resolve a process-based mode first.
         // This ensures that setting custom_type_of_bag = "W-Cut" shows the correct 
         // bag-specific columns even if a CUSTOM-FABRIC row is currently present.
+        let baseVisible = [];
         const mode = resolveMode(frm) || resolveModeFromItemRows(frm);
         if (mode) {
-            return prioritizeQuotationVisibleColumns(
+            baseVisible = prioritizeQuotationVisibleColumns(
                 sanitizeVisibleFieldsForMode(frm, normalizeVisibleFields(mode), mode.id)
             );
+        } else {
+            // Fallback for when no process is selected
+            baseVisible = getDefaultGridVisibleFields();
         }
-        // Fallback for when no process is selected
-        return getDefaultGridVisibleFields();
+
+        // --- Loop Handle Dynamic Visibility ---
+        const items = frm.doc.items || [];
+        let hasBoppLH = false;
+        let hasNonWovenLH = false;
+        items.forEach(row => {
+            const lhp = String(row.custom_lh_process || "").toUpperCase();
+            if (lhp === "NON WOVEN FABRIC") {
+                hasNonWovenLH = true;
+            } else if (lhp.includes("BOPP")) {
+                hasBoppLH = true;
+            }
+        });
+
+        if (hasBoppLH || hasNonWovenLH) {
+            baseVisible.push(
+                "custom_lh_process",
+                "custom_loop_handle_quality",
+                "custom_loop_handle_colour",
+                "custom_loop_handle_gsm",
+                "custom_loop_handle_width_inches"
+            );
+        }
+        if (hasBoppLH) {
+            baseVisible.push(
+                "custom_lh_design_code",
+                "custom_lh_design_name",
+                "custom_lh_no_of_design_colour",
+                "custom_lh_design_colour",
+                "custom_lh_fabric_gsm",
+                "custom_lh_lamination_gsm",
+                "custom_lh_bopp_gsm"
+            );
+        }
+
+        return baseVisible;
     }
 
     function scheduleApplyItemsGrid(frm, opts) {
@@ -2575,6 +2613,9 @@
             }
         },
         custom_process: function (frm) {
+            scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});
+        },
+        custom_lh_process: function (frm) {
             scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});
         },
         process: function (frm) {

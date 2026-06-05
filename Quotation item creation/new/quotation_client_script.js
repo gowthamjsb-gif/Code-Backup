@@ -980,6 +980,73 @@
             });
     }
 
+    function fetchLhDesignFieldsFromMaster(frm, cdt, cdn, opts) {
+        opts = opts || {};
+        const row = locals[cdt] && locals[cdt][cdn];
+        if (!row) return Promise.resolve();
+
+        const linkKey = String(row.custom_lh_design_code || "").trim();
+        const nameKey = String(row.custom_lh_design_name || "").trim();
+        if (!linkKey && !nameKey) return Promise.resolve();
+
+        const masterFields = [
+            "name",
+            "design_name",
+            "design_colour",
+            "no_of_design_colours"
+        ];
+
+        function applyMaster(msg) {
+            if (!msg || !msg.name) return;
+            const updates = [];
+            const masterName = String(msg.design_name || msg.name || "").trim();
+            if (masterName && (opts.forceName || !String(row.custom_lh_design_name || "").trim())) {
+                updates.push(frappe.model.set_value(cdt, cdn, "custom_lh_design_name", masterName));
+            }
+            if (opts.includeColour) {
+                const colour = String(msg.design_colour || "").trim();
+                if (colour && (opts.forceColour || !String(row.custom_lh_design_colour || "").trim())) {
+                    updates.push(frappe.model.set_value(cdt, cdn, "custom_lh_design_colour", colour));
+                }
+                const noOf = msg.no_of_design_colours != null && msg.no_of_design_colours !== ""
+                    ? msg.no_of_design_colours
+                    : msg.no_of_design_colour;
+                if (noOf != null && noOf !== "" &&
+                    (opts.forceNoOf || !(row.custom_lh_no_of_design_colour || row.custom_lh_no_of_design_colours))) {
+                    updates.push(frappe.model.set_value(cdt, cdn, "custom_lh_no_of_design_colour", String(noOf)));
+                }
+            }
+            if (String(row.custom_lh_design_code || "").trim() !== msg.name && msg.name) {
+                updates.push(frappe.model.set_value(cdt, cdn, "custom_lh_design_code", msg.name));
+            }
+            return Promise.all(updates).catch(() => { });
+        }
+
+        function loadByKey(key) {
+            if (!key) return Promise.resolve(null);
+            return frappe.db.get_value("DESIGN MASTER", key, masterFields)
+                .then(r => (r && r.message && r.message.name) ? r.message : null)
+                .catch(() => null);
+        }
+
+        return loadByKey(linkKey)
+            .then(msg => {
+                if (msg) return applyMaster(msg);
+                return loadByKey(nameKey).then(msg2 => {
+                    if (msg2) return applyMaster(msg2);
+                    if (/^\d+$/.test(linkKey)) {
+                        return frappe.db.get_value(
+                            "DESIGN MASTER",
+                            { design_code: linkKey },
+                            masterFields
+                        ).then(r => {
+                            if (r && r.message && r.message.name) return applyMaster(r.message);
+                        }).catch(() => { });
+                    }
+                });
+            });
+    }
+
     function applyBagRowDesignDefaults(frm, cdt, cdn) {
         const row = locals[cdt] && locals[cdt][cdn];
         if (!row) return;
@@ -1849,6 +1916,19 @@
                         }
                     };
                 }
+            });
+
+            // Filter LH Process to only allow the 3 valid processes
+            frm.set_query("custom_lh_process", "items", function () {
+                return {
+                    filters: {
+                        name: ["in", [
+                            "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC",
+                            "NON WOVEN BOPP LAMINATED SLITTED FABRIC",
+                            "NON WOVEN FABRIC"
+                        ]]
+                    }
+                };
             });
         },
 
@@ -3245,6 +3325,18 @@
                 });
             }
             scheduleItemTaxTemplateSync(frm);
+        },
+        custom_lh_design_code: function (frm, cdt, cdn) {
+            const row = locals[cdt][cdn];
+            if (row && row.custom_lh_design_code) {
+                fetchLhDesignFieldsFromMaster(frm, cdt, cdn, { includeColour: true });
+            }
+        },
+        custom_lh_design_name: function (frm, cdt, cdn) {
+            const row = locals[cdt] && locals[cdt][cdn];
+            if (row && row.custom_lh_design_name && !row.custom_lh_design_code) {
+                fetchLhDesignFieldsFromMaster(frm, cdt, cdn, { includeColour: true, forceName: true });
+            }
         },
         custom_design_code: function (frm, cdt, cdn) {
             const row = locals[cdt][cdn];
