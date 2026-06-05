@@ -5891,7 +5891,7 @@ def run_all(doc):
                                     loop_width_m = loop_width_mm / 1000.0
                                     if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                         loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                            doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, doc.get("hsn", ""), loop_type_raw
+                                            doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                         )
                                         loop_fabric_item_code = loop_result_tuple[0]
                                         loop_fabric_bom_no = loop_result_tuple[1]
@@ -6345,7 +6345,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, doc.get("hsn", ""), loop_type_raw
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
@@ -7528,7 +7528,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, doc.get("hsn", ""), loop_type_raw
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
@@ -8279,7 +8279,7 @@ def run_all(doc):
                                 loop_width_m = loop_width_mm / 1000.0
                                 if loop_width_m > 0 and loop_type_raw in ["NON WOVEN BOPP LAMINATED SLITTED FABRIC", "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"]:
                                     loop_result_tuple = ensure_lh_bopp_item_and_bom(
-                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, doc.get("hsn", ""), loop_type_raw
+                                        doc, row, loop_q, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, row.get("gst_hsn_code", ""), loop_type_raw
                                     )
                                     loop_fabric_item_code = loop_result_tuple[0]
                                     loop_fabric_bom_no = loop_result_tuple[1]
