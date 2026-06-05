@@ -9685,6 +9685,9 @@ def run_all(doc):
                                 or "D CUT PLAIN" in p_upper or "D CUT PRINTED FLEXO" in p_upper or "D CUT LAMINATED" in p_upper or "D CUT LAMINATED PRINTED" in p_upper or "D CUT BOPP ROTO" in p_upper or "D CUT METTALIC ROTO" in p_upper
                                 or "PLAIN W CUT BAG" in p_upper or "LAMINATED W CUT BAG" in p_upper or "PRINTED W CUT BAG" in p_upper or "W-CUT" in p_upper.replace("-", " ")
                             )
+                            if row_is_bag:
+                                row.gst_hsn_code = "63059000"
+                                row.hsn_sac = "63059000"
                             row_tax_tpl = (selected_company_item_tax_template_18 or selected_company_item_tax_template) if row_is_bag else selected_company_item_tax_template
                             if row_tax_tpl:
                                 try:

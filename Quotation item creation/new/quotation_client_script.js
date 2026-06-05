@@ -382,7 +382,12 @@
         "J Vasanth Exports": { intra: "Output GST In-state - JVE", inter: "Output GST Out-state - JVE" }
     };
 
-    function getHSNFromGSM(gsmVal) {
+    function getHSNFromGSM(gsmVal, row) {
+        if (row) {
+            let p = (row.custom_process || row.process || "").trim().toUpperCase();
+            let bagType = (row.custom_bag_type || "").trim().toUpperCase();
+            if (p.includes("BAG") || p.includes("D CUT") || p.includes("W CUT") || bagType) return "63059000";
+        }
         const gsm = parseInt(gsmVal, 10) || 0;
         if (gsm >= 15 && gsm <= 24) return "56031100";
         if (gsm >= 25 && gsm <= 70) return "56031200";
@@ -3008,7 +3013,7 @@
                 }
             });
             // Ensure HSN is set immediately based on GSM slab.
-            const hsn = getHSNFromGSM(row.custom_gsm);
+            const hsn = getHSNFromGSM(row.custom_gsm, row);
             if (hsn) {
                 // Different ERPN sites use either gst_hsn_code or hsn_sac on the row.
                 frappe.model.set_value(cdt, cdn, "gst_hsn_code", hsn).catch(() => { });
@@ -3473,7 +3478,7 @@
             calculateFabricGSM(frm, cdt, cdn);
             // Keep HSN in sync with GSM.
             const row = locals[cdt][cdn];
-            const hsn = getHSNFromGSM(row.custom_gsm);
+            const hsn = getHSNFromGSM(row.custom_gsm, row);
             if (hsn) {
                 frappe.model.set_value(cdt, cdn, "gst_hsn_code", hsn).catch(() => { });
                 frappe.model.set_value(cdt, cdn, "hsn_sac", hsn).catch(() => { });
