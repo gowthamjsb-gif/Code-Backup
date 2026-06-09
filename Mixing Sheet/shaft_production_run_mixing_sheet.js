@@ -13,6 +13,17 @@ const SOLVENT_MACHINES = [
     'VR - 1200MM BOPP PRINTING MACHINE'
 ];
 
+const EXCLUDED_MACHINES = [
+    'TTT- L3 - OYANG C900 BAG MAKING LINE',
+    'TTT- L2 - OYANG C700 BAG MAKING LINE',
+    'TTT- L1 - OYANG C700 BAG MAKING LINE',
+    'VTP-L1 LEADER OYANG MACHINE',
+    'VTP-L2 LEADER ZX MACHINE',
+    'JVE-L3 B700 BAG MAKING MACHINE',
+    'JVE-L2 B700 BAG MAKING MACHINE',
+    'JVE-L1 B700 BAG MAKING MACHINE'
+];
+
 let _mix_dialog = null;
 let _reminder_interval = null;
 
@@ -20,6 +31,8 @@ frappe.ui.form.on('Shaft Production Run', {
 
     refresh(frm) {
         if (!frm.doc.production_plan) return;
+        
+        if (EXCLUDED_MACHINES.includes(frm.doc.custom_unit)) return;
 
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('Mixing Sheet'), () => open_mixing_sheet(frm));
@@ -32,6 +45,7 @@ frappe.ui.form.on('Shaft Production Run', {
     },
 
     before_submit(frm) {
+        if (EXCLUDED_MACHINES.includes(frm.doc.custom_unit)) return Promise.resolve();
         return finalize_wo_materials(frm);
     }
 });

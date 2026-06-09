@@ -104,6 +104,9 @@ frappe.ui.form.on('Shaft Production Run', {
             auto_populate_polybags(frm);
         }
 
+        auto_populate_process_wastage(frm);
+        toggle_wastage_columns(frm);
+
         // Auto-calculate wastage if items are mapped/populated but wastage table is empty,
         // or if it's an invalid unit and we need to clear the table.
         setTimeout(() => {
@@ -130,6 +133,8 @@ frappe.ui.form.on('Shaft Production Run', {
 
     custom_unit: function (frm) {
         calculate_wastage_automation(frm, true);
+        auto_populate_process_wastage(frm);
+        toggle_wastage_columns(frm);
     },
 
     // Trigger when a new roll is added (some buttons add row and then set values)
@@ -147,7 +152,17 @@ frappe.ui.form.on('Shaft Production Run', {
     customer: function (frm) { auto_populate_polybags(frm); },
     party_name: function (frm) { auto_populate_polybags(frm); },
     custom_customer: function (frm) { auto_populate_polybags(frm); },
-    custom_party_name: function (frm) { auto_populate_polybags(frm); }
+    custom_party_name: function (frm) { auto_populate_polybags(frm); },
+    custom_is_box_bag: function(frm) { 
+        auto_populate_process_wastage(frm); 
+        toggle_wastage_columns(frm); 
+    },
+    custom_is_bag: function(frm) { 
+        auto_populate_process_wastage(frm); 
+        toggle_wastage_columns(frm); 
+    },
+    custom_is_d_cut: function(frm) { toggle_wastage_columns(frm); },
+    custom_is_w_cut: function(frm) { toggle_wastage_columns(frm); }
 });
 
 frappe.ui.form.on('Shaft Production Run Item', {
@@ -182,7 +197,9 @@ function append_wastage_running_series(frm, wastage_field) {
     var w_chk_f = wast_fields.find(f => f.includes('recycle_to_next')) || 'recycle_to_next';
     var w_net_f = wast_fields.find(f => f.includes('net_wastage')) || 'net_wastage';
 
-    var counters = {};
+    var bases_to_process = {};
+    var requires_api_call = false;
+
     (frm.doc[wastage_field] || []).forEach(row => {
         var is_rec_next = (row[w_chk_f] || row.recycle_to_next || row.custom_recycle_to_next) ? 1 : 0;
         var net_qty = flt(row[w_net_f] || row.net_wastage || 0);
@@ -191,19 +208,67 @@ function append_wastage_running_series(frm, wastage_field) {
             return;
         }
 
-        if (!row[b_f]) {
-            row[b_f] = get_wastage_batch_base_for_row(frm, row);
-        }
-
-        var base = get_wastage_batch_base(row[b_f]);
+        var base = get_wastage_batch_base(row[b_f] || get_wastage_batch_base_for_row(frm, row));
         if (!base) return;
 
-        if (!counters[base]) {
-            counters[base] = 1;
+        if (!bases_to_process[base]) {
+            bases_to_process[base] = [];
         }
+        bases_to_process[base].push(row);
 
-        row[b_f] = base + "/" + counters[base];
-        counters[base] = counters[base] + 1;
+        if (!row[b_f] || !row[b_f].includes('/')) {
+            requires_api_call = true;
+        }
+    });
+
+    if (!requires_api_call) return;
+
+    Object.keys(bases_to_process).forEach(base => {
+        frappe.call({
+            method: "frappe.client.get_list",
+            args: {
+                doctype: "Batch",
+                filters: [["name", "like", base + "/%"]],
+                fields: ["name"],
+                limit_page_length: 500
+            },
+            callback: function(r) {
+                var max_n = 0;
+                if (r.message) {
+                    r.message.forEach(b => {
+                        var parts = b.name.split('/');
+                        if (parts.length === 2) {
+                            var n = parseInt(parts[1]);
+                            if (!isNaN(n) && n > max_n) max_n = n;
+                        }
+                    });
+                }
+
+                bases_to_process[base].forEach(row => {
+                    if (row[b_f] && row[b_f].startsWith(base + "/")) {
+                        var existing_n = parseInt(row[b_f].split('/')[1]);
+                        if (!isNaN(existing_n) && existing_n > max_n) {
+                            max_n = existing_n;
+                        }
+                    }
+                });
+
+                var current_n = max_n + 1;
+                var changed = false;
+
+                bases_to_process[base].forEach(row => {
+                    if (!row[b_f] || !row[b_f].includes('/')) {
+                        row[b_f] = base + "/" + current_n;
+                        current_n++;
+                        changed = true;
+                    }
+                });
+
+                if (changed) {
+                    frm.refresh_field(wastage_field);
+                }
+            }
+        });
     });
 }
 
@@ -669,6 +734,10 @@ function show_patty_stock_dialog(frm) {
                 return;
             }
 
+            r.message.forEach(row => {
+                row.consume_qty = row.balance_quantity;
+            });
+
             let d = new frappe.ui.Dialog({
                 title: 'Available Patty Stock',
                 size: 'extra-large',
@@ -683,9 +752,11 @@ function show_patty_stock_dialog(frm) {
                             { fieldtype: 'Data', fieldname: 'colour', label: 'Color', read_only: 1, in_list_view: 1 },
                             { fieldtype: 'Data', fieldname: 'gsm', label: 'GSM', read_only: 1, in_list_view: 1 },
                             { fieldtype: 'Data', fieldname: 'width_inch', label: 'Width', read_only: 1, in_list_view: 1 },
-                            { fieldtype: 'Float', fieldname: 'balance_quantity', label: 'Available (Kg)', read_only: 1, in_list_view: 1 }
+                            { fieldtype: 'Float', fieldname: 'balance_quantity', label: 'Available (Kg)', read_only: 1, in_list_view: 1 },
+                            { fieldtype: 'Float', fieldname: 'consume_qty', label: 'Consume (Kg)', in_list_view: 1 }
                         ],
-                        data: r.message
+                        data: r.message,
+                        in_place_edit: true
                     }
                 ],
                 primary_action_label: 'Consume Selected',
@@ -728,7 +799,7 @@ function consume_patty_stock(frm, selections) {
             args: {
                 parent_doc: frm.doc.name,
                 ps_ids: selections.map(s => s.name).join(','),
-                consume_qtys: selections.map(s => s.consume_qty).join(',')
+                consume_qtys: selections.map(s => s.consume_qty !== undefined ? flt(s.consume_qty) : flt(s.balance_quantity)).join(',')
             },
             freeze: true,
             freeze_message: "Recording Patty Stock consumption...",
@@ -1109,6 +1180,9 @@ function calculate_wastage_automation(frm, force_all) {
     if (!wastage_field) return;
 
     if (!is_valid_unit) {
+        if (frm.doc.custom_is_box_bag) {
+            return;
+        }
         if (frm.doc[wastage_field] && frm.doc[wastage_field].length > 0) {
             frm.clear_table(wastage_field);
             frm.refresh_field(wastage_field);
@@ -1258,4 +1332,166 @@ function add_polybag_items(frm, polybag_field, items) {
     if (added_count > 0) {
         frm.refresh_field(polybag_field);
     }
+}
+
+// --- PROCESS WASTAGE AUTOMATION ---
+function auto_populate_process_wastage(frm) {
+    if (frm.doc.docstatus > 0) return;
+
+    let wastage_field = ['running_patty_wastage', 'wastage_details', 'custom_wastage_details', 'custom_running_patty_wastage'].find(f => frm.fields_dict[f]);
+    if (!wastage_field) return;
+
+    let target_items = [];
+
+    // Helper to check fields
+    let has_check = (keywords) => {
+        return Object.keys(frm.doc).some(k => {
+            if ((k.startsWith('is_') || k.startsWith('custom_is_')) && frm.doc[k] === 1) {
+                let name = k.toLowerCase();
+                return keywords.some(kw => name.includes(kw));
+            }
+            return false;
+        });
+    };
+
+    let is_bag = has_check(['bag', 'box_bag', 'd_cut', 'w_cut']);
+    
+    if (is_bag) {
+        let unit_val = String(frm.doc.unit || frm.doc.custom_unit || "").toUpperCase();
+        let is_box_bag = unit_val.includes('LEADER OYANG') || unit_val.includes('LEADER ZX');
+        let is_d_cut = unit_val.includes('OYANG C900') || unit_val.includes('OYANG C700') || unit_val.includes('B700 BAG MAKING');
+
+        if (is_box_bag) {
+            target_items = ["WASTE - 007", "WASTE - 008", "WASTE - 009"]; // Sheet, De-lam, Without Handle
+        } else if (is_d_cut) {
+            target_items = ["WASTE - 007", "WASTE - 011"]; // Sheet, Punch
+        }
+    } 
+    else if (has_check(['printing', 'bopp_film'])) {
+        target_items = ["WASTE - 007", "WASTE - 010"]; // Sheet Waste, Ink Waste
+    }
+    else if (has_check(['lamination'])) {
+        target_items = ["WASTE - 006"]; // Lamination Trim
+    }
+    else if (has_check(['slitting', 'rewinding', 'sheet_cutting'])) {
+        target_items = ["WASTE - 007"]; // Sheet Waste
+    }
+
+    if (target_items.length === 0) return;
+    
+    let existing_rows = frm.doc[wastage_field] || [];
+    let w_fields = frm.fields_dict[wastage_field].grid.docfields.map(df => df.fieldname);
+    
+    // Robustly find the fieldname for the Item column
+    let item_f = w_fields.find(f => f === 'item' || f === 'item_code' || f === 'custom_item' || f === 'wastage_item' || f.includes('item')) || 'item';
+    let qty_f = w_fields.find(f => f.includes('wastage_qty') || f === 'qty' || f === 'quantity' || f === 'net_wastage') || 'wastage_qty';
+    let pcs_f = w_fields.find(f => f.includes('pieces') || f === 'pcs') || null;
+
+    let existing_items = existing_rows.map(r => r[item_f] || r.item || r.item_code || r.custom_item).filter(Boolean);
+    let added = false;
+    let grid = frm.fields_dict[wastage_field].grid;
+
+    // Clean up any old blank rows
+    let blank_rows = (grid.data || []).filter(r => !(r[item_f] || r.item || r.item_code || r.custom_item));
+    if (blank_rows.length > 0) {
+        blank_rows.forEach(r => {
+            if (grid.grid_rows_by_docname[r.name]) {
+                grid.grid_rows_by_docname[r.name].remove();
+            }
+        });
+        added = true; // Trigger refresh
+    }
+
+    // Optional: Clean up items that don't belong to the current machine type
+    // If they switched from Box Bag to D-Cut, we might want to remove De-lam waste
+    let wrong_items = existing_rows.filter(r => {
+        let val = r[item_f] || r.item || r.item_code || r.custom_item;
+        return val && !target_items.includes(val);
+    });
+    if (wrong_items.length > 0) {
+        wrong_items.forEach(r => {
+            if (grid.grid_rows_by_docname[r.name]) grid.grid_rows_by_docname[r.name].remove();
+        });
+        added = true;
+    }
+
+    target_items.forEach(target => {
+        if (!existing_items.includes(target)) {
+            let row = frm.add_child(wastage_field);
+            frappe.model.set_value(row.doctype, row.name, item_f, target);
+            if (qty_f) frappe.model.set_value(row.doctype, row.name, qty_f, 0);
+            if (pcs_f) frappe.model.set_value(row.doctype, row.name, pcs_f, 0);
+            
+            // Fetch UOM and Item Name
+            frappe.db.get_value("Item", target, ["stock_uom", "item_name"], (r) => {
+                if (r) {
+                    let uom_f = w_fields.find(f => f === 'uom' || f === 'stock_uom');
+                    if (uom_f && r.stock_uom) frappe.model.set_value(row.doctype, row.name, uom_f, r.stock_uom);
+                    
+                    let name_f = w_fields.find(f => f === 'item_name' || f === 'wastage_item_name');
+                    if (name_f && r.item_name) frappe.model.set_value(row.doctype, row.name, name_f, r.item_name);
+                    
+                    frm.refresh_field(wastage_field);
+                }
+            });
+            added = true;
+        }
+    });
+
+    if (added) {
+        frm.refresh_field(wastage_field);
+    }
+}
+
+// --- COLUMN VISIBILITY AUTOMATION ---
+function toggle_wastage_columns(frm) {
+    let wastage_field = ['running_patty_wastage', 'wastage_details', 'custom_wastage_details', 'custom_running_patty_wastage'].find(f => frm.fields_dict[f]);
+    if (!wastage_field || !frm.fields_dict[wastage_field].grid) return;
+
+    let grid = frm.fields_dict[wastage_field].grid;
+    
+    // Determine the process type based on checkboxes
+    let is_bag = frm.doc.custom_is_bag || frm.doc.custom_is_box_bag || frm.doc.custom_is_d_cut || frm.doc.custom_is_w_cut || frm.doc.is_bag || frm.doc.is_box_bag || frm.doc.is_d_cut || frm.doc.is_w_cut;
+    let unit_val = String(frm.doc.unit || frm.doc.custom_unit || "").toUpperCase();
+    let is_box_bag = is_bag && (unit_val.includes('LEADER OYANG') || unit_val.includes('LEADER ZX'));
+    
+    let is_other_process = false;
+    
+    // Check all fields in doc to find if any 'is_...' or 'custom_is_...' is ticked, and isn't a bag or non-woven
+    Object.keys(frm.doc).forEach(k => {
+        if ((k.startsWith('custom_is_') || k.startsWith('is_')) && frm.doc[k] === 1) {
+            let proc_name = k.toLowerCase();
+            // mix_roll and non_woven should behave like the default (showing all columns)
+            if (!proc_name.includes('box_bag') && !proc_name.includes('d_cut') && !proc_name.includes('w_cut') && !proc_name.includes('non_woven') && !proc_name.includes('mix_roll')) {
+                is_other_process = true;
+            }
+        }
+    });
+
+    grid.docfields.forEach(df => {
+        let f = df.fieldname;
+        let l = (df.label || "").toLowerCase();
+        
+        // Always show these core fields
+        if (f === 'item' || f === 'item_code' || f === 'custom_item' || f === 'wastage_item' || 
+            f === 'wastage_qty' || f === 'net_wastage' || f === 'qty' || f === 'item_name') {
+            grid.toggle_display(f, true);
+        }
+        // Pieces field: show only for Box Bag Process
+        else if (f === 'pieces' || f === 'custom_pieces' || f === 'pcs' || l.includes('pieces') || l.includes('pcs')) {
+            grid.toggle_display(f, !!is_box_bag);
+        }
+        // All other fields (which belong to non-woven)
+        else {
+            if (is_bag || is_other_process) {
+                // Hide non-woven fields for bag and other processes
+                grid.toggle_display(f, false);
+            } else {
+                // Show non-woven fields if it is the non-woven process
+                grid.toggle_display(f, true);
+            }
+        }
+    });
+    
+    grid.refresh();
 }

@@ -518,29 +518,29 @@ else:
             "unit4",
         )
 
-        # Raw material table vs projected qty — informational only (do NOT block PP submit).
-        # This script runs on on_submit; blocking here cannot prevent stock issues anyway.
-        # Parent/child split PPs and BOM-only items often show false "shortages" on mr_items.
-        shortages = []
-        for mr_item in doc.get("mr_items") or []:
-            if float(mr_item.get("quantity") or 0) > 0:
-                is_raw_material = mr_item.item_code.startswith(("PP", "MB", "SA", "RM"))
-                reqd_bom_qty = float(mr_item.get("required_bom_qty") or 0)
-                proj_qty = float(mr_item.get("projected_qty") or 0)
-                if is_raw_material and proj_qty < reqd_bom_qty:
-                    if mr_item.item_code not in shortages:
-                        shortages.append(mr_item.item_code)
-
-        if shortages:
-            frappe.msgprint(
-                "<b>Possible raw material shortfall (not blocking submit):</b><br>"
-                + "<br>".join(shortages)
-                + "<br><br>Verify stock and material transfer; replenish if needed.",
-                title="Raw material check",
-                indicator="orange",
-            )
-
         if allow_auto_start_pp:
+            # Pre-flight check: if Auto-Start is enabled, block Production Plan submission
+            # if there is not enough actual stock in the required warehouses.
+            shortages_list = []
+            
+            # Aggregate requirements from mr_items (Production Plan Material Request Items)
+            for mr_item in doc.get("mr_items") or []:
+                req_qty = float(mr_item.get("required_qty") or mr_item.get("quantity") or 0)
+                if req_qty > 0:
+                    wh = mr_item.get("warehouse") or "Raw Materials - JSB-1ZT"
+                    actual_qty = frappe.db.get_value("Bin", {"item_code": mr_item.item_code, "warehouse": wh}, "actual_qty") or 0
+                    if actual_qty < req_qty:
+                        shortages_list.append(
+                            f"<li><b>{mr_item.item_code}</b> in <b>{wh}</b> — Required: {round(req_qty, 3)}, Available: {round(actual_qty, 3)}</li>"
+                        )
+                        
+            if shortages_list:
+                frappe.throw(
+                    "<b>Production Plan submission blocked due to raw material shortage.</b><br>"
+                    "Because this plan is set to auto-start (Unit 1-4), sufficient raw materials must be available before submission.<br><ul>"
+                    + "".join(shortages_list)
+                    + "</ul><br>Please verify stock and complete a material transfer manually if needed before submitting."
+                )
             # Include both Draft and Submitted WOs; some flows submit WO but skip "start" step.
             wo_names = frappe.get_all(
                 "Work Order",

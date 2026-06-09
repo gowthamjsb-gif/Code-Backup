@@ -2243,6 +2243,41 @@ function is_jve_unit(frm) {
     return (frm.doc.custom_unit || '').trim().toUpperCase() === 'JVE - SHEET CUTTING MACHINE';
 }
 
+// ============================================================
+// HELPER: Fetch item names for bag size extraction
+// ============================================================
+function with_item_names(items, callback) {
+    var codes = [];
+    items.forEach(function(i) {
+        if (i.item_code && codes.indexOf(i.item_code) === -1) {
+            codes.push(i.item_code);
+        }
+    });
+
+    if (codes.length === 0) {
+        callback({});
+        return;
+    }
+
+    frappe.call({
+        method: 'frappe.client.get_list',
+        args: {
+            doctype: 'Item',
+            filters: { name: ['in', codes] },
+            fields: ['name', 'item_name', 'description']
+        },
+        callback: function(r) {
+            var map = {};
+            if (r.message) {
+                r.message.forEach(function(d) {
+                    map[d.name] = (d.item_name || '') + ' ' + (d.description || '');
+                });
+            }
+            callback(map);
+        }
+    });
+}
+
 // ---- Main entry point — groups items by item_code + sheet_cutting_size ----
 function calculate_bundles(frm) {
     if (!is_jve_unit(frm)) {
@@ -2254,13 +2289,14 @@ function calculate_bundles(frm) {
         return;
     }
 
-    // Group po_items by item_code + sheet_cutting_size — each unique pair = one section
-    var item_groups = [];
-    var key_map = {};
+    with_item_names(frm.doc.po_items || [], function(item_names_map) {
+        // Group po_items by item_code + sheet_cutting_size — each unique pair = one section
+        var item_groups = [];
+        var key_map = {};
 
-    (frm.doc.po_items || []).forEach(function (item) {
-        var pcs = flt(item.custom_no_of_sheets_pcs);
-        if (pcs > 0) {
+        (frm.doc.po_items || []).forEach(function (item) {
+            var pcs = flt(item.custom_no_of_sheets_pcs);
+            if (pcs > 0) {
             var key = (item.item_code || '') + '||' + (item.custom_sheet_cutting_size || '');
             var job_id = (item.custom_s_no || item.job_id || item.idx || '').toString().trim();
 
@@ -2278,11 +2314,25 @@ function calculate_bundles(frm) {
                 if (job_id) {
                     initial_job_ids = job_id.split(',').map(function (s) { return s.trim(); }).filter(function (id) { return id; });
                 }
+                
+                var ext_bag_size = item.bag_size || item.custom_bag_size || '';
+                if (!ext_bag_size) {
+                    var item_str = item.item_name || item.description || item_names_map[item.item_code] || item.item_code || '';
+                    var match = item_str.match(/\(\s*([^)]*?\d[^)]*?["xX*][^)]*?)\s*\)/);
+                    if (!match) match = item_str.match(/\(\s*([^\)]+)\s*\)/); // fallback
+                    if (match) {
+                        ext_bag_size = match[1].trim();
+                    } else {
+                        // Debug: Show exactly what we tried to match against
+                        ext_bag_size = "NO MATCH IN: " + item_str.substring(0, 50);
+                    }
+                }
+
                 key_map[key] = item_groups.length;
                 item_groups.push({
                     item_code: item.item_code || '',
                     sheet_cutting_size: item.custom_sheet_cutting_size || '',
-                    custom_bag_size: item.custom_bag_size || '',
+                    custom_bag_size: ext_bag_size,
                     pcs: pcs,
                     job_ids: initial_job_ids
                 });
@@ -2306,6 +2356,7 @@ function calculate_bundles(frm) {
     }
 
     show_bundle_dialog(frm, item_groups);
+    });
 }
 
 // ---- Compute combinations: full bundles + one remainder bundle ----
@@ -2403,6 +2454,9 @@ function show_bundle_dialog(frm, item_groups) {
         if (grp.sheet_cutting_size) {
             msg += '&nbsp;&nbsp;<span style="font-size:12px; color:#444; background:#d0dcf8; padding:1px 8px; border-radius:10px;">' + grp.sheet_cutting_size + '</span>';
         }
+        if (grp.custom_bag_size) {
+            msg += '&nbsp;&nbsp;<span style="font-size:12px; color:#856404; background:#fff3cd; border:1px solid #ffeeba; padding:1px 8px; border-radius:10px;">Bag Size: ' + grp.custom_bag_size + '</span>';
+        }
         msg += '</div>';
         msg += '<div style="font-weight:bold; color:#3d6ae8; font-size:14px;">' + grp.pcs + ' pcs</div>';
         msg += '</div>';
@@ -2449,6 +2503,7 @@ function show_bundle_dialog(frm, item_groups) {
                     c.item_code = grp.item_code;
                     c.job_id = grp.job_id_str;
                     c.sheet_cutting_size = grp.sheet_cutting_size;
+                    c.bag_size = grp.custom_bag_size;
                     final_combinations.push(c);
                 });
             });
@@ -2513,11 +2568,13 @@ function apply_bundle_results(frm, combinations) {
         var dct = row.doctype;
 
         frappe.model.set_value(dct, dcn, 's_no', idx + 1);
-        frappe.model.set_value(dct, dcn, 'job_id', c.job_id);
-        frappe.model.set_value(dct, dcn, 'custom_job_id', c.job_id); // Fallback in case of prefix
-        frappe.model.set_value(dct, dcn, 'item_code', c.item_code);
-        frappe.model.set_value(dct, dcn, 'sheet_cutting_size', c.sheet_cutting_size);
-        frappe.model.set_value(dct, dcn, 'custom_bag_size', c.custom_bag_size || '');
+        frappe.model.set_value(dct, dcn, 'item_code', c.item_code).then(function() {
+            frappe.model.set_value(dct, dcn, 'job_id', c.job_id);
+            frappe.model.set_value(dct, dcn, 'custom_job_id', c.job_id); // Fallback in case of prefix
+            frappe.model.set_value(dct, dcn, 'sheet_cutting_size', c.sheet_cutting_size);
+            frappe.model.set_value(dct, dcn, 'bag_size', c.bag_size || '');
+            frappe.model.set_value(dct, dcn, 'custom_bag_size', c.bag_size || '');
+        });
         frappe.model.set_value(dct, dcn, 'no_of_bundles', c.no_of_bundles);
         frappe.model.set_value(dct, dcn, 'pkts_per_bundle', c.pkts_per_bundle);
         frappe.model.set_value(dct, dcn, 'pcs_per_packet', c.pcs_per_packet);
@@ -2559,11 +2616,8 @@ function calculate_packing(frm) {
         return;
     }
 
-    var item_groups = [];
-    var key_map = {};
-
     var packing = (frm.doc.custom_packing || '').trim();
-    if (!packing) {
+    if (packing !== 'Box Packing' && packing !== 'Bora Packing') {
         frappe.msgprint({
             title: __('Missing Packing Type'),
             indicator: 'orange',
@@ -2572,9 +2626,13 @@ function calculate_packing(frm) {
         return;
     }
 
-    (frm.doc.po_items || []).forEach(function (item) {
-        var pcs = flt(item.planned_qty); // using planned_qty instead of custom_no_of_sheets_pcs
-        if (pcs > 0) {
+    with_item_names(frm.doc.po_items || [], function(item_names_map) {
+        var item_groups = [];
+        var key_map = {};
+
+        (frm.doc.po_items || []).forEach(function (item) {
+            var pcs = flt(item.planned_qty); // using planned_qty instead of custom_no_of_sheets_pcs
+            if (pcs > 0) {
             var key = (item.item_code || '') + '||' + packing; // Grouping by item code and packing
             var job_id = (item.custom_s_no || item.job_id || item.idx || '').toString().trim();
 
@@ -2592,11 +2650,25 @@ function calculate_packing(frm) {
                 if (job_id) {
                     initial_job_ids = job_id.split(',').map(function (s) { return s.trim(); }).filter(function (id) { return id; });
                 }
+                
+                var ext_bag_size = item.bag_size || item.custom_bag_size || '';
+                if (!ext_bag_size) {
+                    var item_str = item.item_name || item.description || item_names_map[item.item_code] || item.item_code || '';
+                    var match = item_str.match(/\(\s*([^)]*?\d[^)]*?["xX*][^)]*?)\s*\)/);
+                    if (!match) match = item_str.match(/\(\s*([^\)]+)\s*\)/); // fallback
+                    if (match) {
+                        ext_bag_size = match[1].trim();
+                    } else {
+                        // Debug: Show exactly what we tried to match against
+                        ext_bag_size = "NO MATCH IN: " + item_str.substring(0, 50);
+                    }
+                }
+
                 key_map[key] = item_groups.length;
                 item_groups.push({
                     item_code: item.item_code || '',
                     sheet_cutting_size: item.custom_sheet_cutting_size || '', // Keep it just in case
-                    custom_bag_size: item.custom_bag_size || '',
+                    custom_bag_size: ext_bag_size,
                     custom_packing: packing,
                     pcs: pcs,
                     job_ids: initial_job_ids
@@ -2619,21 +2691,22 @@ function calculate_packing(frm) {
         return;
     }
 
-    // Pre-fill from existing saved data
-    var existing = (frm.doc.custom_bundle_calculation || []);
-    if (existing.length > 0) {
-        item_groups.forEach(function (grp) {
-            existing.forEach(function (r) {
-                if (r.item_code === grp.item_code && (r.sheet_cutting_size || '') === grp.sheet_cutting_size) {
-                    grp.saved_pcs_per_box = Math.max(grp.saved_pcs_per_box || 0, r.custom_pcs_per_box || 0);
-                    grp.saved_pcs_per_packet = Math.max(grp.saved_pcs_per_packet || 0, r.pcs_per_packet || 0);
-                    grp.saved_pkts_per_bundle = Math.max(grp.saved_pkts_per_bundle || 0, r.pkts_per_bundle || 0);
-                }
+        // Pre-fill from existing saved data
+        var existing = (frm.doc.custom_bundle_calculation || []);
+        if (existing.length > 0) {
+            item_groups.forEach(function (grp) {
+                existing.forEach(function (r) {
+                    if (r.item_code === grp.item_code && (r.sheet_cutting_size || '') === grp.sheet_cutting_size) {
+                        grp.saved_pcs_per_box = Math.max(grp.saved_pcs_per_box || 0, r.custom_pcs_per_box || 0);
+                        grp.saved_pcs_per_packet = Math.max(grp.saved_pcs_per_packet || 0, r.pcs_per_packet || 0);
+                        grp.saved_pkts_per_bundle = Math.max(grp.saved_pkts_per_bundle || 0, r.pkts_per_bundle || 0);
+                    }
+                });
             });
-        });
-    }
+        }
 
-    show_packing_dialog(frm, item_groups);
+        show_packing_dialog(frm, item_groups);
+    });
 }
 
 function compute_packing_combinations_box(total_pcs, pcs_per_box) {
@@ -2734,17 +2807,24 @@ function show_packing_dialog(frm, item_groups) {
         if (grp.sheet_cutting_size) {
             msg += '&nbsp;&nbsp;<span style="font-size:12px; color:#444; background:#d0dcf8; padding:1px 8px; border-radius:10px;">' + grp.sheet_cutting_size + '</span>';
         }
+        if (grp.custom_bag_size) {
+            msg += '&nbsp;&nbsp;<span style="font-size:12px; color:#856404; background:#fff3cd; border:1px solid #ffeeba; padding:1px 8px; border-radius:10px;">Bag Size: ' + grp.custom_bag_size + '</span>';
+        }
         msg += '</div>';
         msg += '<div style="font-weight:bold; color:#3d6ae8; font-size:14px;">' + grp.pcs + ' pcs</div>';
         msg += '</div>';
 
         // Packing Type Selection based on custom_packing
-        var ptype_val = (grp.custom_packing || '').toLowerCase().includes('box') ? 'Box' : 'Bora';
+        var ptype_val = '';
+        var p = (grp.custom_packing || '').toLowerCase();
+        if (p.includes('box')) ptype_val = 'Box';
+        else if (p.includes('bora')) ptype_val = 'Bora';
 
         msg += '<div style="padding:10px 14px 0px 14px; background:#fff;">';
         msg += '<label style="font-size:11px; font-weight:600; display:block; margin-bottom:3px; color:#555;">Packing Type</label>';
         // Disabled so the user knows it's driven by the item data
         msg += '<select id="pck-type-' + idx + '" class="form-control pck-type-select" data-idx="' + idx + '" style="width:200px;" disabled>';
+        msg += '<option value="" ' + (ptype_val === '' ? 'selected' : '') + ' disabled>Select Packing Type</option>';
         msg += '<option value="Box" ' + (ptype_val === 'Box' ? 'selected' : '') + '>Box Packing</option>';
         msg += '<option value="Bora" ' + (ptype_val === 'Bora' ? 'selected' : '') + '>Bora Packing</option>';
         msg += '</select>';
@@ -2788,6 +2868,7 @@ function show_packing_dialog(frm, item_groups) {
             item_groups.forEach(function (grp, idx) {
                 var packing_type = d.$wrapper.find('#pck-type-' + idx).val();
 
+                if (!packing_type) { all_valid = false; return; }
                 if (packing_type === 'Box') {
                     var pcs_per_box = parseInt(d.$wrapper.find('#pck-pcs-per-box-' + idx).val()) || 0;
                     if (pcs_per_box <= 0) { all_valid = false; return; }
@@ -2796,10 +2877,11 @@ function show_packing_dialog(frm, item_groups) {
                         c.item_code = grp.item_code;
                         c.job_id = grp.job_id_str;
                         c.sheet_cutting_size = grp.sheet_cutting_size;
+                        c.bag_size = grp.custom_bag_size;
                         c.is_box = true;
                         final_combinations.push(c);
                     });
-                } else {
+                } else if (packing_type === 'Bora') {
                     var pcs_per_packet = parseInt(d.$wrapper.find('#pck-pcs-per-packet-' + idx).val()) || 0;
                     var pkts_per_bundle = parseInt(d.$wrapper.find('#pck-pkts-per-bundle-' + idx).val()) || 0;
                     if (pcs_per_packet <= 0 || pkts_per_bundle <= 0) { all_valid = false; return; }
@@ -2808,6 +2890,7 @@ function show_packing_dialog(frm, item_groups) {
                         c.item_code = grp.item_code;
                         c.job_id = grp.job_id_str;
                         c.sheet_cutting_size = grp.sheet_cutting_size;
+                        c.bag_size = grp.custom_bag_size;
                         final_combinations.push(c);
                     });
                 }
@@ -2841,7 +2924,7 @@ function show_packing_dialog(frm, item_groups) {
         if (ptype === 'Box') {
             var ppb = parseInt(d.$wrapper.find('#pck-pcs-per-box-' + idx).val()) || 0;
             combos = compute_packing_combinations_box(grp.pcs, ppb);
-        } else {
+        } else if (ptype === 'Bora') {
             var ppp = parseInt(d.$wrapper.find('#pck-pcs-per-packet-' + idx).val()) || 0;
             var ppbnd = parseInt(d.$wrapper.find('#pck-pkts-per-bundle-' + idx).val()) || 0;
             combos = compute_bundle_combinations(grp.pcs, ppp, ppbnd);
@@ -2860,9 +2943,12 @@ function show_packing_dialog(frm, item_groups) {
         if (ptype === 'Box') {
             d.$wrapper.find('#pck-inputs-box-' + idx).css('display', 'flex');
             d.$wrapper.find('#pck-inputs-bora-' + idx).hide();
-        } else {
+        } else if (ptype === 'Bora') {
             d.$wrapper.find('#pck-inputs-box-' + idx).hide();
             d.$wrapper.find('#pck-inputs-bora-' + idx).css('display', 'flex');
+        } else {
+            d.$wrapper.find('#pck-inputs-box-' + idx).hide();
+            d.$wrapper.find('#pck-inputs-bora-' + idx).hide();
         }
         update_result(idx);
     });
@@ -2881,11 +2967,13 @@ function apply_packing_results(frm, combinations) {
         var dct = row.doctype;
 
         frappe.model.set_value(dct, dcn, 's_no', idx + 1);
-        frappe.model.set_value(dct, dcn, 'job_id', c.job_id);
-        frappe.model.set_value(dct, dcn, 'custom_job_id', c.job_id); // Fallback in case of prefix
-        frappe.model.set_value(dct, dcn, 'item_code', c.item_code);
-        frappe.model.set_value(dct, dcn, 'sheet_cutting_size', c.sheet_cutting_size);
-        frappe.model.set_value(dct, dcn, 'custom_bag_size', c.custom_bag_size || '');
+        frappe.model.set_value(dct, dcn, 'item_code', c.item_code).then(function() {
+            frappe.model.set_value(dct, dcn, 'job_id', c.job_id);
+            frappe.model.set_value(dct, dcn, 'custom_job_id', c.job_id); // Fallback in case of prefix
+            frappe.model.set_value(dct, dcn, 'sheet_cutting_size', c.sheet_cutting_size);
+            frappe.model.set_value(dct, dcn, 'bag_size', c.bag_size || '');
+            frappe.model.set_value(dct, dcn, 'custom_bag_size', c.bag_size || '');
+        });
         // Note: total_pcs_per_bundle is intentionally NOT set for Packing Calculation (only Bundle Calculation uses it)
 
         if (c.is_box) {

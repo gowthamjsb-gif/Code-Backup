@@ -142,20 +142,17 @@ try:
         log("Wastage series starts at " + str(series_start))
 
     def get_next_wastage_series(base_batch_w, start_number):
-        """Return next available series number for {base_batch_w}/N for today."""
-        today = frappe.utils.today()
+        """Return next available series number for {base_batch_w}/N."""
         existing = frappe.db.get_all(
-            "Patty Stock",
+            "Batch",
             filters=[
-                ["batch_no", "like", base_batch_w + "/%"],
-                ["creation", ">=", today + " 00:00:00"],
-                ["creation", "<=", today + " 23:59:59"]
+                ["name", "like", base_batch_w + "/%"]
             ],
-            fields=["batch_no"]
+            fields=["name"]
         )
         used_nums = []
         for rec in existing:
-            parts = (rec.batch_no or "").split("/")
+            parts = (rec.name or "").split("/")
             if len(parts) == 2:
                 try:
                     n = int(parts[1])
@@ -231,6 +228,16 @@ try:
             wastage_batch_no = base_w + "/" + str(series_counter[base_w])
             # Plain assignment (no += on subscripts) — required by RestrictedPython in Server Script
             series_counter[base_w] = series_counter[base_w] + 1
+            
+            # Update the child table row with the real assigned batch number so the UI stays in sync
+            b_f = "batch_no"
+            if not row.get(b_f) and row.get("batch"):
+                b_f = "batch"
+            
+            try:
+                row.db_set(b_f, wastage_batch_no)
+            except:
+                pass
 
             ensure_batch(wastage_batch_no, p_ic, qty, qty, mtr, order_code)
             log("Wastage Batch No: " + wastage_batch_no)

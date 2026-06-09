@@ -30,13 +30,15 @@ def get_company_by_unit(unit, default_company):
         "tnspl - l3 rewinding machine"
     }
     vasanth_units = {
+        "vasanth unit",
+        "vasanth unite",
         "jve - sheet cutting machine",
         "jve - slitting machine",
         "jve - printing machine 2 colour 1600mm",
         "jve - printing machine 4 colour 1600mm",
-        "jve-l3 b700 bag making machine",
-        "jve-l2 b700 bag making machine",
-        "jve-l1 b700 bag making machine"
+        "jve-l3  b700 bag making machine",
+        "jve-l2  b700 bag making machine",
+        "jve-l1  b700 bag making machine"
     }
     varshine_units = {
         "vr - 1200mm bopp printing machine"
@@ -83,7 +85,7 @@ for r in ps.items:
     color = (r.color or "").strip().upper() or "NO_COLOR"
     
     for unit in units_list:
-        key = f"{r.idx}||{unit}||{quality}||{color}"
+        key = f"{unit}||{quality}||{color}"
         group_map.setdefault(key, []).append(r)
 
 # 2. Fetch all EXISTING Production Plans (BOTH Draft and Submitted/Material Requested)
@@ -103,9 +105,9 @@ unit_to_pp_map = {}
 # 3. Process rows and Map to PPs (Update, Recycle, or Create)
 for key, rows in group_map.items():
     parts = key.split("||")
-    unit_val = parts[1]
-    doc_quality_val = parts[2] if parts[2] != "NO_QUALITY" else ""
-    doc_color_val = parts[3] if parts[3] != "NO_COLOR" else ""
+    unit_val = parts[0]
+    doc_quality_val = parts[1] if parts[1] != "NO_QUALITY" else ""
+    doc_color_val = parts[2] if parts[2] != "NO_COLOR" else ""
     
     company = get_company_by_unit(unit_val, default_company)
     plan_codes = sorted(list(set(str(r.custom_plan_code).strip() for r in rows if r.custom_plan_code)))

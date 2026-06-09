@@ -27,7 +27,7 @@ function unique_batch_prefixes(str_or_list) {
 }
 
 frappe.ui.form.on('Shift Wise Production Entry', {
-    setup: function (frm) {
+    setup: function(frm) {
         // Automatically find all child tables that look like recycle/consumption tables
         Object.keys(frm.fields_dict).forEach(function (fieldname) {
             var fdef = frm.fields_dict[fieldname];
@@ -84,6 +84,33 @@ frappe.ui.form.on('Shift Wise Production Entry', {
     },
 
     refresh: function (frm) {
+        frm.trigger("setup_barcode_scanner");
+
+        // Auto-fill from redirect: URL params set by Shaft Production Run
+        if (frm.is_new()) {
+            var url_params = new URLSearchParams(window.location.search);
+            var has_redirect_params = url_params.get('shift') || url_params.get('posting_date');
+            if (has_redirect_params) {
+                setTimeout(function() {
+                    var field_map = {
+                        'posting_date': url_params.get('posting_date'),
+                        'shift': url_params.get('shift'),
+                        'company': url_params.get('company'),
+                        'unit': url_params.get('unit'),
+                        'custom_unit': url_params.get('unit')
+                    };
+                    Object.keys(field_map).forEach(function(fname) {
+                        var val = field_map[fname];
+                        if (val && val !== 'undefined' && val !== 'null' && frm.fields_dict[fname]) {
+                            frm.set_value(fname, val);
+                        }
+                    });
+                    // Note: 'get_data' is no longer triggered automatically,
+                    // allowing user to select company and unit manually before fetching data.
+                }, 600);
+            }
+        }
+        var base_target;
         if (frm.doc.docstatus === 0) {
             if (frm.is_new() && !frm.doc.posting_date) {
                 frm.set_value("posting_date", frappe.datetime.get_today());
@@ -121,6 +148,16 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                     show_rolls_popup(frm, "", "", all_stock_entries.join(","));
                 });
             }
+            
+            // Bypass Frappe's strict 'Save' validation by making it non-mandatory temporarily
+            // so that we can enforce it strictly only on Submit.
+            if (frm.fields_dict.consumption_items && frm.fields_dict.consumption_items.grid) {
+                frm.fields_dict.consumption_items.grid.update_docfield_property("actual_consumption", "reqd", 0);
+            }
+            if (frm.fields_dict.fg_consumption_items && frm.fields_dict.fg_consumption_items.grid) {
+                frm.fields_dict.fg_consumption_items.grid.update_docfield_property("actual_consumption", "reqd", 0);
+                frm.fields_dict.fg_consumption_items.grid.update_docfield_property("actual_consumption", "read_only", 1);
+            }
         }
     },
 
@@ -132,6 +169,25 @@ frappe.ui.form.on('Shift Wise Production Entry', {
 
     validate: function (frm) {
         calculate_totals(frm);
+    },
+
+    before_submit: function(frm) {
+        // Ensure actual_consumption is filled for all RM and FG items
+        var empty_consumption = false;
+        if (frm.doc.consumption_items) {
+            $.each(frm.doc.consumption_items, function(i, d) {
+                if (!d.actual_consumption || d.actual_consumption <= 0) empty_consumption = true;
+            });
+        }
+        if (frm.doc.fg_consumption_items) {
+            $.each(frm.doc.fg_consumption_items, function(i, d) {
+                if (!d.actual_consumption || d.actual_consumption <= 0) empty_consumption = true;
+            });
+        }
+        
+        if (empty_consumption) {
+            frappe.throw(__("Please enter Actual Consumption for all items before submitting."));
+        }
     },
 
     unit: function (frm) { recalculate_target(frm); },
@@ -151,14 +207,19 @@ frappe.ui.form.on('Shift Wise Production Entry', {
             frappe.msgprint("Please select Posting Date and Shift first.");
             return;
         }
+        var unit_val = frm.doc.custom_unit || frm.doc.unit || '';
         frappe.call({
             method: "get_shift_details",
-            args: { posting_date: frm.doc.posting_date, shift: frm.doc.shift, unit: frm.doc.unit },
+            args: { posting_date: frm.doc.posting_date, shift: frm.doc.shift, unit: unit_val },
             freeze: true,
+            freeze_message: "Fetching shift data, please wait...",
             callback: function (r) {
-                if (r.message) {
-                    if (r.message.operator) frm.set_value("operator", r.message.operator);
-                    if (r.message.supervisor) frm.set_value("supervisor", r.message.supervisor);
+                if (!r.message) {
+                    frappe.msgprint("No data found for the selected Date, Shift and Unit.");
+                    return;
+                }
+                if (r.message.operator) frm.set_value("custom_operator", r.message.operator);
+                if (r.message.supervisor) frm.set_value("custom_supervisor", r.message.supervisor);
 
                     // ── Production Items ─────────────────────────────────────────
                     frm.clear_table("production_items");
@@ -175,6 +236,27 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                         });
                     }
 
+
+                    // ── FG Consumption Items ─────────────────────────────────────
+                    if (frm.fields_dict.fg_consumption_items) {
+                        frm.clear_table("fg_consumption_items");
+                        if (r.message.fg_batches_map) {
+                            frm.fg_batches_map = r.message.fg_batches_map;
+                        }
+                        if (r.message.fg_consumption_items) {
+                            $.each(r.message.fg_consumption_items, function (i, d) {
+                                var row = frm.add_child("fg_consumption_items");
+                                row.item_code = d.item_code;
+                                row.item_name = d.item_name;
+                                row.batch = d.batch;
+                                row.uom = d.uom;
+                                row.standard_consumption = d.standard_consumption;
+                                row.actual_consumption = ""; // empty initially
+                            });
+                        }
+                        frm.refresh_field("fg_consumption_items");
+                    }
+
                     // ── RM Consumption Items ─────────────────────────────────────
                     frm.clear_table("consumption_items");
                     if (r.message.consumption_items) {
@@ -184,7 +266,7 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                             row.item_name = d.item_name;
                             row.uom = d.uom;
                             row.standard_consumption = d.standard_consumption;
-                            row.actual_consumption = d.standard_consumption;
+                            row.actual_consumption = ""; // empty initially
                             row.sack_weight = 25;
                             row.bags = calc_bags(d.standard_consumption, 25);
                         });
@@ -204,16 +286,51 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                     }
 
                     // ── Core Consumption ─────────────────────────────────────────
-                    if (r.message.core_consumption_items && r.message.core_consumption_items.length > 0 && frm.fields_dict.core_consumption) {
-                        frm.clear_table("core_consumption");
+                    var core_table_name = null;
+                    $.each(frm.fields_dict, function(k, v) {
+                        if (v.df && v.df.fieldtype === 'Table' && (k.indexOf('core') !== -1 || (v.df.options && v.df.options.toLowerCase().indexOf('core') !== -1))) {
+                            core_table_name = k;
+                        }
+                    });
+                    
+                    if (r.message.core_consumption_items && r.message.core_consumption_items.length > 0 && core_table_name) {
+                        frm.clear_table(core_table_name);
                         $.each(r.message.core_consumption_items, function (i, d) {
-                            var row = frm.add_child("core_consumption");
+                            var row = frm.add_child(core_table_name);
                             row.item_code = d.item_code;
                             row.item_name = d.item_name;
                             row.uom = d.uom;
                             row.quantity = d.quantity;
+                            row.quantity_kgs = d.quantity;
+                            row.custom_quantity_kgs = d.quantity;
+                            row.qty = d.quantity;
                         });
-                        frm.refresh_field("core_consumption");
+                        frm.refresh_field(core_table_name);
+                    }
+
+                    // ── Bag Consumables ──────────────────────────────────────────
+                    var bag_table_name = null;
+                    $.each(frm.fields_dict, function(k, v) {
+                        if (v.df && v.df.fieldtype === 'Table' && v.df.options === 'Bag Packing Detail') {
+                            bag_table_name = k;
+                        }
+                    });
+                    if (!bag_table_name) {
+                        if (frm.fields_dict.bag_consumables) bag_table_name = "bag_consumables";
+                        else if (frm.fields_dict.custom_bag_packing_details) bag_table_name = "custom_bag_packing_details";
+                        else if (frm.fields_dict.custom_bag_packing_detail) bag_table_name = "custom_bag_packing_detail";
+                        else if (frm.fields_dict.bag_packing_details) bag_table_name = "bag_packing_details";
+                        else if (frm.fields_dict.bag_packing_detail) bag_table_name = "bag_packing_detail";
+                    }
+                    if (bag_table_name && r.message.bag_consumables && r.message.bag_consumables.length > 0) {
+                        frm.clear_table(bag_table_name);
+                        $.each(r.message.bag_consumables, function (i, d) {
+                            var row = frm.add_child(bag_table_name);
+                            row.item = d.item;
+                            row.quantity_kgs = d.quantity_kgs;
+                            row.uom = d.uom;
+                        });
+                        frm.refresh_field(bag_table_name);
                     }
 
                     // ── Recycle ──────────────────────────────────────────────────
@@ -284,6 +401,29 @@ frappe.ui.form.on('Shift Wise Production Entry', {
 
                     console.log("Full Server Response:", r.message);
 
+                    // ── Specific Wastage (Float Fields) ──────────────────────────
+                    if (r.message.specific_wastage_totals) {
+                        var waste_map = {
+                            "WASTE - 001": "spinning_waste",
+                            "WASTE - 002": "calender_waste",
+                            "WASTE - 003": "roll_waste",
+                            "WASTE - 004": "lumps_waste",
+                            "WASTE - 005": "mixing_waste",
+                            "WASTE - 006": "lamination_trim_waste_kgs",
+                            "WASTE - 007": "sheet_waste_kgs",
+                            "WASTE - 008": "de_lam_waste_kgs",
+                            "WASTE - 009": "without_handle_waste_kgs",
+                            "WASTE - 010": "ink_waste_kgs",
+                            "WASTE - 011": "punch_waste_kgs"
+                        };
+                        $.each(waste_map, function (item_code, fieldname) {
+                            if (frm.fields_dict[fieldname]) {
+                                var val = r.message.specific_wastage_totals[item_code] || 0;
+                                frm.set_value(fieldname, val);
+                            }
+                        });
+                    }
+
                     // ── Batch Number (store unique prefix(es) only, e.g. 034263/… → 034263) ──
                     var batch_list = r.message.all_batch_nos || [];
                     var batch_str = batch_list.length
@@ -298,8 +438,91 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                     if (batch_str) frm.set_value("batch_no", batch_str);
 
                     calculate_totals(frm);
-                }
+                    
+                    // Auto-save the form after data is successfully fetched
+                    frm.save();
             }
+        });
+    },
+
+    setup_barcode_scanner: function(frm) {
+        if (!frm.fields_dict.fg_consumption_items || !frm.fields_dict.fg_consumption_items.grid) return;
+
+        // Avoid adding the button multiple times
+        if (frm.custom_buttons && frm.custom_buttons['Scan FG Barcode']) return;
+
+        // Add a custom button for scanning FG Barcode below the grid
+        var grid = frm.fields_dict.fg_consumption_items.grid;
+        grid.add_custom_button(__('Scan FG Barcode'), function() {
+            var d = new frappe.ui.Dialog({
+                title: 'Scan FG Barcode',
+                fields: [
+                    {
+                        label: 'Barcode / Batch No',
+                        fieldname: 'barcode',
+                        fieldtype: 'Data',
+                        options: 'Barcode',
+                        description: 'You can type, use a USB scanner, or click the barcode icon to use your camera.'
+                    }
+                ],
+                primary_action_label: 'Submit',
+                primary_action: function(values) {
+                    var scanned_val = values.barcode;
+                    if (!scanned_val) return;
+                    
+                    // Fetch Batch details (try matching name or batch_id)
+                    frappe.db.get_value('Batch', { 'name': scanned_val }, ['name', 'item', 'custom_net_weight'])
+                    .then(r => {
+                        if (r && r.message && r.message.name) {
+                            process_batch(r.message);
+                        } else {
+                            // Try matching by batch_id if name doesn't match
+                            frappe.db.get_value('Batch', { 'batch_id': scanned_val }, ['name', 'item', 'custom_net_weight'])
+                            .then(r2 => {
+                                if (r2 && r2.message && r2.message.name) {
+                                    process_batch(r2.message);
+                                } else {
+                                    frappe.msgprint("Batch not found for barcode: " + scanned_val);
+                                    reset_scanner();
+                                }
+                            });
+                        }
+                    });
+
+                    function process_batch(batch_doc) {
+                        var item_code = batch_doc.item;
+                        var net_weight = flt(batch_doc.custom_net_weight) || 0;
+                        
+                        // Check if this item exists in fg_consumption_items
+                        var existing_row = null;
+                        if (frm.doc.fg_consumption_items) {
+                            existing_row = frm.doc.fg_consumption_items.find(row => row.item_code === item_code);
+                        }
+                        
+                        if (existing_row) {
+                            // Add to existing actual consumption
+                            var current_ac = flt(existing_row.actual_consumption) || 0;
+                            frappe.model.set_value(existing_row.doctype, existing_row.name, 'actual_consumption', current_ac + net_weight);
+                            calculate_totals(frm);
+                            frappe.show_alert({message: 'Added ' + net_weight + ' to existing row for ' + item_code, indicator: 'green'});
+                        } else {
+                            frappe.msgprint("Item " + item_code + " from the scanned batch is not in the FG Consumption list.");
+                        }
+                        reset_scanner();
+                    }
+
+                    function reset_scanner() {
+                        // Clear input and refocus for continuous scanning
+                        d.set_value('barcode', '');
+                        setTimeout(() => { d.get_input('barcode').focus(); }, 100);
+                    }
+                }
+            });
+            d.show();
+            // Automatically focus the barcode input
+            setTimeout(() => {
+                d.get_input('barcode').focus();
+            }, 500);
         });
     }
 });
@@ -357,6 +580,13 @@ frappe.ui.form.on('Shift Core Consumption Item', {
     }
 });
 
+// Bag Packing Detail child table handler
+frappe.ui.form.on('Bag Packing Detail', {
+    quantity_kgs: function (frm, cdt, cdn) {
+        calculate_totals(frm);
+    }
+});
+
 function find_recycle_table(frm) {
     // 1. Check explicit fieldnames
     if (frm.fields_dict.recycle) return 'recycle';
@@ -388,7 +618,7 @@ function recalculate_target(frm) {
     var PER_SHIFT = { "Unit 1": 2000, "Unit 2": 6500, "Unit 3": 4500, "Unit 4": 4000 };
     var ALL_UNITS_SUM = 2000 + 6500 + 4500 + 4000; // 19000
     var is_full_day = (frm.doc.shift === "Full Day");
-    var is_all_units = (frm.doc.unit === "All Units");
+    var is_all_units = (!frm.doc.unit || frm.doc.unit === "All Units");
 
     var base_target;
     if (is_all_units) {
@@ -402,21 +632,45 @@ function recalculate_target(frm) {
 }
 
 function calculate_totals(frm) {
-    var total_prod = 0, total_std = 0, total_act = 0;
+    var total_prod = 0, total_rm_std = 0, total_rm_act = 0, total_fg_std = 0, total_fg_act = 0;
+    
     if (frm.doc.production_items) {
         $.each(frm.doc.production_items, function (i, d) { total_prod += flt(d.produced_qty); });
     }
+    
     if (frm.doc.consumption_items) {
         $.each(frm.doc.consumption_items, function (i, d) {
-            total_std += flt(d.standard_consumption);
-            total_act += flt(d.actual_consumption);
+            total_rm_std += flt(d.standard_consumption);
+            total_rm_act += flt(d.actual_consumption);
         });
     }
 
+    if (frm.doc.fg_consumption_items) {
+        $.each(frm.doc.fg_consumption_items, function (i, d) {
+            total_fg_std += flt(d.standard_consumption);
+            total_fg_act += flt(d.actual_consumption);
+        });
+    }
+
+    var total_std = total_rm_std + total_fg_std;
+    var total_act = total_rm_act + total_fg_act;
+
     frm.set_value("total_production_qty", total_prod);
-    if (frm.fields_dict.total_standard_consumption) frm.set_value("total_standard_consumption", total_std);
-    if (frm.fields_dict.total_actual_consumption) frm.set_value("total_actual_consumption", total_act);
-    if (frm.fields_dict.total_variance) frm.set_value("total_variance", total_std - total_act);
+    
+    // Set RM fields (Checking both the new exact names and the old field names you might have renamed!)
+    if (frm.fields_dict.total_rm_standard_consumption) frm.set_value("total_rm_standard_consumption", total_rm_std);
+    else if (frm.fields_dict.total_standard_consumption) frm.set_value("total_standard_consumption", total_rm_std); // Fallback for old field
+
+    if (frm.fields_dict.total_rm_actual_consumption) frm.set_value("total_rm_actual_consumption", total_rm_act);
+    else if (frm.fields_dict.total_actual_consumption) frm.set_value("total_actual_consumption", total_rm_act); // Fallback for old field
+
+    if (frm.fields_dict.total_rm_variance) frm.set_value("total_rm_variance", total_rm_std - total_rm_act);
+    else if (frm.fields_dict.total_variance) frm.set_value("total_variance", total_rm_std - total_rm_act); // Fallback for old field
+    
+    // Set FG fields
+    if (frm.fields_dict.total_fg_standard_consumption_kgs) frm.set_value("total_fg_standard_consumption_kgs", total_fg_std);
+    if (frm.fields_dict.total_fg_actual_consumption_kgs) frm.set_value("total_fg_actual_consumption_kgs", total_fg_act);
+    if (frm.fields_dict.total_fg_variance_kgs) frm.set_value("total_fg_variance_kgs", total_fg_std - total_fg_act);
 
     // Sum Bags (Poly Bags)
     var total_bags = 0;
@@ -432,8 +686,33 @@ function calculate_totals(frm) {
     }
     if (frm.fields_dict.total_core_consumption) frm.set_value("total_core_consumption", total_core);
 
+    // Bag Consumables Total
+    var total_bag_cons = 0;
+    var bag_table_name_tot = null;
+    $.each(frm.fields_dict, function(k, v) {
+        if (v.df && v.df.fieldtype === 'Table' && v.df.options === 'Bag Packing Detail') {
+            bag_table_name_tot = k;
+        }
+    });
+    if (!bag_table_name_tot) {
+        if (frm.fields_dict.bag_consumables) bag_table_name_tot = "bag_consumables";
+        else if (frm.fields_dict.custom_bag_packing_details) bag_table_name_tot = "custom_bag_packing_details";
+        else if (frm.fields_dict.custom_bag_packing_detail) bag_table_name_tot = "custom_bag_packing_detail";
+        else if (frm.fields_dict.bag_packing_details) bag_table_name_tot = "bag_packing_details";
+        else if (frm.fields_dict.bag_packing_detail) bag_table_name_tot = "bag_packing_detail";
+    }
+
+    if (bag_table_name_tot && frm.doc[bag_table_name_tot]) {
+        $.each(frm.doc[bag_table_name_tot], function (i, d) { total_bag_cons += flt(d.quantity_kgs); });
+    }
+    if (frm.fields_dict.total_bag_consumables) frm.set_value("total_bag_consumables", total_bag_cons);
+
     // Wastage Total
-    var total_waste = (flt(frm.doc.spinning_waste) || 0) + (flt(frm.doc.calender_waste) || 0) + (flt(frm.doc.roll_waste) || 0) + (flt(frm.doc.lumps_waste) || 0) + (flt(frm.doc.mixing_waste) || 0);
+    var total_waste = (flt(frm.doc.spinning_waste) || 0) + (flt(frm.doc.calender_waste) || 0) + (flt(frm.doc.roll_waste) || 0) + 
+                      (flt(frm.doc.lumps_waste) || 0) + (flt(frm.doc.mixing_waste) || 0) +
+                      (flt(frm.doc.lamination_trim_waste_kgs) || 0) + (flt(frm.doc.sheet_waste_kgs) || 0) +
+                      (flt(frm.doc.de_lam_waste_kgs) || 0) + (flt(frm.doc.without_handle_waste_kgs) || 0) +
+                      (flt(frm.doc.ink_waste_kgs) || 0) + (flt(frm.doc.punch_waste_kgs) || 0);
     var w_table_name = frm.fields_dict.running_patty_wastage ? 'running_patty_wastage' : (frm.fields_dict.running_patty_waste ? 'running_patty_waste' : null);
     if (w_table_name && frm.doc[w_table_name]) {
         $.each(frm.doc[w_table_name], function (i, d) { total_waste += (flt(d.wastage_qty_kg) || flt(d.qty) || 0); });
@@ -450,13 +729,30 @@ function calculate_totals(frm) {
     }
     frm.set_value("total_recycled", total_recycled);
 
-    if (total_act > 0) {
-        frm.set_value("production_", (total_prod / total_act) * 100.0);
-        frm.set_value("recycle_", (total_recycled / total_act) * 100.0);
+    var denominator = total_act > 0 ? total_act : total_std;
+
+    if (denominator > 0) {
+        frm.set_value("production_", (total_prod / denominator) * 100.0);
+        frm.set_value("recycle_", (total_recycled / denominator) * 100.0);
+    } else {
+        frm.set_value("production_", 0);
+        frm.set_value("recycle_", 0);
+    }
+
+    if (total_prod > 0) {
         frm.set_value("wastage_", (total_waste / total_prod) * 100.0);
+    } else {
+        frm.set_value("wastage_", 0);
     }
     if (flt(frm.doc.target) > 0) frm.set_value("target_acheived_", (total_prod / flt(frm.doc.target)) * 100.0);
-    frm.refresh_fields(["total_production_qty", "total_standard_consumption", "total_actual_consumption", "total_variance", "total_wastage", "total_recycled", "total_polybag", "total_core_consumption", "production_", "recycle_", "wastage_", "target_acheived_"]);
+    frm.refresh_fields([
+        "total_production_qty", 
+        "total_rm_standard_consumption", "total_rm_actual_consumption", "total_rm_variance",
+        "total_fg_standard_consumption", "total_fg_actual_consumption", "total_fg_variance",
+        "total_standard_consumption", "total_actual_consumption", "total_variance", 
+        "total_wastage", "total_recycled", "total_polybag", "total_core_consumption", 
+        "production_", "recycle_", "wastage_", "target_acheived_"
+    ]);
 }
 
 function update_consumption_options(frm, row, type, child_dt) {
@@ -551,16 +847,38 @@ function show_rolls_popup(frm, item_code, work_order, stock_entry) {
             ].join('');
 
             // ── Info Row HTML ──
-            var d_date = frappe.datetime.str_to_user(frm.doc.posting_date);
+            var roll_unit = frm.doc.unit || "All Units";
+            var roll_shift = frm.doc.shift || "—";
+            var roll_date = frm.doc.posting_date ? frappe.datetime.str_to_user(frm.doc.posting_date) : "—";
+
+            if (rolls.length > 0) {
+                var unique_units = [];
+                var unique_shifts = [];
+                var unique_dates = [];
+                $.each(rolls, function(i, r) {
+                    if (r.unit && unique_units.indexOf(r.unit) === -1) unique_units.push(r.unit);
+                    if (r.shift && unique_shifts.indexOf(r.shift) === -1) unique_shifts.push(r.shift);
+                    if (r.run_date && unique_dates.indexOf(r.run_date) === -1) unique_dates.push(r.run_date);
+                });
+
+                if (unique_units.length === 1 && unique_units[0]) roll_unit = unique_units[0];
+                else if (unique_units.length > 1) roll_unit = unique_units.join(", ");
+
+                if (unique_shifts.length === 1 && unique_shifts[0]) roll_shift = unique_shifts[0];
+                else if (unique_shifts.length > 1) roll_shift = unique_shifts.join(", ");
+
+                if (unique_dates.length === 1 && unique_dates[0]) roll_date = frappe.datetime.str_to_user(unique_dates[0]);
+            }
+
             var info_cell_style = "border:1px solid #555; padding:0;";
             var lbl_style = "background:#e65100; color:#fff; font-size:8px; font-weight:700; text-transform:uppercase; padding:2px 5px; text-align:center; display:block;";
             var val_style = "font-size:10.5px; font-weight:700; color:#111; padding:3px 5px; text-align:center; display:block;";
             var info_html = [
                 '<table style="width:100%; border-collapse:collapse; margin-bottom:6px;">',
                 '<tr>',
-                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Date</span><span style="' + val_style + '">' + d_date + '</span></td>',
-                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Shift</span><span style="' + val_style + '">' + (frm.doc.shift || "—") + '</span></td>',
-                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Unit</span><span style="' + val_style + '">' + (frm.doc.unit || "—") + '</span></td>',
+                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Date</span><span style="' + val_style + '">' + roll_date + '</span></td>',
+                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Shift</span><span style="' + val_style + '">' + roll_shift + '</span></td>',
+                '  <td style="' + info_cell_style + '"><span style="' + lbl_style + '">Unit</span><span style="' + val_style + '">' + roll_unit + '</span></td>',
                 '</tr>',
                 '</table>'
             ].join('');
@@ -574,6 +892,24 @@ function show_rolls_popup(frm, item_code, work_order, stock_entry) {
             // ── Section heading ──
             var section_head = '<div style="background:#f57f17; border:1px solid #e65100; border-bottom:none; padding:4px 10px; font-size:10px; font-weight:800; text-transform:uppercase; text-align:center; color:#000;">' + title + '</div>';
 
+            // ── Check if there are bag items ──
+            var has_bags = false;
+            var has_rolls = false;
+            $.each(rolls, function(i, row) {
+                if (row.item_name && row.item_name.toUpperCase().indexOf("BAG") !== -1) {
+                    has_bags = true;
+                } else {
+                    has_rolls = true;
+                }
+            });
+
+            var length_header = 'Length (Mtrs)';
+            if (has_bags && !has_rolls) {
+                length_header = 'Bag Pcs';
+            } else if (has_bags && has_rolls) {
+                length_header = 'Length (Mtrs) / Bag Pcs';
+            }
+
             // ── Table HTML ──
             var html = section_head + '<table style="width:100%; border-collapse:collapse; font-size:10px; font-family:Arial,sans-serif;">';
             html += '<thead><tr>' +
@@ -581,22 +917,31 @@ function show_rolls_popup(frm, item_code, work_order, stock_entry) {
                 '<th style="' + th_style + '">Item Code</th>' +
                 '<th style="' + th_style + '">Quality</th>' +
                 '<th style="' + th_style + '">Colour</th>' +
-                '<th style="' + th_style + '">Length (Mtrs)</th>' +
+                '<th style="' + th_style + '">' + length_header + '</th>' +
                 '<th style="' + th_style + '">Net Weight (Kgs)</th>' +
                 '<th style="' + th_style + '">Gross Weight (Kgs)</th>' +
                 '<th style="' + th_style + '">Order Code</th>' +
                 '<th style="' + th_style + '">Shaft Run</th>' +
                 '</tr></thead><tbody>';
 
-            var t_nw = 0, t_gw = 0, t_mtr = 0;
+            var t_nw = 0, t_gw = 0, t_mtr = 0, t_bags = 0;
             $.each(rolls, function (i, row) {
+                var is_bag = row.item_name && row.item_name.toUpperCase().indexOf("BAG") !== -1;
                 var bg = (i % 2 === 0) ? td_style : td_e_style;
                 html += '<tr>';
                 html += '<td style="' + bg + '">' + (row.batch_no || "") + '</td>';
                 html += '<td style="' + bg + '">' + (row.item_code || "") + '</td>';
                 html += '<td style="' + bg + '">' + (row.quality || "Unknown") + '</td>';
                 html += '<td style="' + bg + '">' + (row.colour || "Unknown") + '</td>';
-                html += '<td style="' + bg + '">' + flt(row.meter_roll).toFixed(2) + '</td>';
+                
+                if (is_bag) {
+                    html += '<td style="' + bg + '">' + flt(row.custom_achieved_bag_pcs).toFixed(0) + '</td>';
+                    t_bags += flt(row.custom_achieved_bag_pcs);
+                } else {
+                    html += '<td style="' + bg + '">' + flt(row.meter_roll).toFixed(2) + '</td>';
+                    t_mtr += flt(row.meter_roll);
+                }
+                
                 html += '<td style="' + bg + '">' + flt(row.net_weight).toFixed(3) + '</td>';
                 html += '<td style="' + bg + '">' + flt(row.gross_weight).toFixed(3) + '</td>';
                 html += '<td style="' + bg + '">' + (row.party_code || "") + '</td>';
@@ -604,12 +949,19 @@ function show_rolls_popup(frm, item_code, work_order, stock_entry) {
                 html += '</tr>';
                 t_nw += flt(row.net_weight);
                 t_gw += flt(row.gross_weight);
-                t_mtr += flt(row.meter_roll);
             });
 
             html += '<tr>';
             html += '<td colspan="4" style="' + tf_style + ' text-align: right; padding-right: 15px;">Consolidated Totals</td>';
-            html += '<td style="' + tf_style + ' text-align: center;">' + t_mtr.toFixed(2) + '</td>';
+            
+            if (has_bags && !has_rolls) {
+                html += '<td style="' + tf_style + ' text-align: center;">' + t_bags.toFixed(0) + '</td>';
+            } else if (!has_bags && has_rolls) {
+                html += '<td style="' + tf_style + ' text-align: center;">' + t_mtr.toFixed(2) + '</td>';
+            } else {
+                html += '<td style="' + tf_style + ' text-align: center;">' + t_mtr.toFixed(2) + ' Mtrs / ' + t_bags.toFixed(0) + ' Pcs</td>';
+            }
+            
             html += '<td style="' + tf_style + ' text-align: center;">' + t_nw.toFixed(3) + '</td>';
             html += '<td style="' + tf_style + ' text-align: center;">' + t_gw.toFixed(3) + '</td>';
             html += '<td colspan="2" style="' + tf_style + '"></td>';
@@ -640,3 +992,35 @@ function show_rolls_popup(frm, item_code, work_order, stock_entry) {
         }
     });
 }
+
+// Handler for the FG Consumption child table 'Batch' button
+frappe.ui.form.on("Shift FG Consumption item", {
+    batch: function(frm, cdt, cdn) {
+        var row = locals[cdt][cdn];
+        var item_code = row.item_code;
+        
+        if (!item_code) {
+            frappe.msgprint("Please select an item first.");
+            return;
+        }
+        if (!frm.fg_batches_map || !frm.fg_batches_map[item_code]) {
+            frappe.msgprint("No batch data available for this item.");
+            return;
+        }
+        var batches = frm.fg_batches_map[item_code];
+        
+        var html = '<table class="table table-bordered"><thead><tr><th>Batch No</th><th>Item Code</th><th>Net Weight (Kgs)</th><th>Shaft Run</th></tr></thead><tbody>';
+        batches.forEach(function(b) {
+            html += '<tr><td>' + (b.batch_no || '') + '</td><td>' + b.item_code + '</td><td>' + b.net_weight + '</td><td>' + b.spr + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        
+        var d = new frappe.ui.Dialog({
+            title: 'Batches for ' + item_code,
+            fields: [{ fieldtype: 'HTML', fieldname: 'table_html', options: html }],
+            primary_action_label: 'Close',
+            primary_action: function() { d.hide(); }
+        });
+        d.show();
+    }
+});

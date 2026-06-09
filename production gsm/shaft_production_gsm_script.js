@@ -21,7 +21,18 @@ frappe.ui.form.on('Shaft Production Run Item', {
 });
 
 function calculate_production_gsm(frm, cdt, cdn) {
-    if (frm.doc.custom_unit === "Lamination Unit") {
+    const excluded_units = [
+        'VTP-L1 LEADER OYANG MACHINE',
+        'VTP-L2 LEADER ZX MACHINE',
+        'JVE-L3 B700 BAG MAKING MACHINE',
+        'JVE-L2 B700 BAG MAKING MACHINE',
+        'JVE-L1 B700 BAG MAKING MACHINE',
+        'TTT- L3 - OYANG C900 BAG MAKING LINE',
+        'TTT- L2 - OYANG C700 BAG MAKING LINE',
+        'TTT- L1 - OYANG C700 BAG MAKING LINE'
+    ];
+
+    if (frm.doc.custom_unit === "Lamination Unit" || excluded_units.includes(frm.doc.custom_unit)) {
         return; 
     }
     

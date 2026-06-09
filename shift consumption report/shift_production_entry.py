@@ -5,10 +5,16 @@
 
 posting_date = frappe.form_dict.get('posting_date')
 shift = frappe.form_dict.get('shift')
-unit = frappe.form_dict.get('unit')
+unit_raw = frappe.form_dict.get('unit')
+if isinstance(unit_raw, str) and unit_raw.strip().lower() in ("none", "null", "undefined", ""):
+    unit = None
+else:
+    unit = unit_raw
 
 if not posting_date or not shift:
     frappe.throw("Posting Date and Shift are required")
+
+is_all_units = (not unit or unit == "All Units")
 
 CORE_MAPPING = {
     "1600": "PC - 1005151", "2160": "PC - 1005158", "2286": "PC - 1005159",
@@ -16,22 +22,67 @@ CORE_MAPPING = {
 }
 
 spr_filters_v_r_f = { "docstatus": 1, "run_date": posting_date, "shift": shift }
-if unit:
-    spr_filters_v_r_f["custom_unit"] = unit
-
-spr_list_v_r_f = frappe.get_all("Shaft Production Run", filters=spr_filters_v_r_f, fields=["name", "shift", "custom_unit"])
+spr_list_v_r_f = frappe.get_all("Shaft Production Run", filters=spr_filters_v_r_f, fields=["name", "shift"])
 
 if not spr_list_v_r_f:
-    frappe.response['message'] = { "production_items": [], "consumption_items": [], "base_batch_no": "", "all_batch_nos": [], "core_consumption_items": [], "polybag_items": [], "wastage_items": [], "recycle_items": [] }
+    frappe.response['message'] = { "production_items": [], "consumption_items": [], "base_batch_no": "", "all_batch_nos": [], "core_consumption_items": [], "polybag_items": [], "wastage_items": [], "recycle_items": [], "bag_consumables": [] }
 else:
     valid_work_orders_v_r = []
     core_totals_v_r = {}
     polybag_totals_v_r = {}
+    bag_consumables_totals_v_r = {}
     wastage_totals_v_r = {}
     recycle_totals_v_r = {}
+    fg_consumption_list_v_r = []
+    consumption_map_v_r = {}
 
     for spr_meta_p_r in spr_list_v_r_f:
         spr_doc_p_r = frappe.get_doc("Shaft Production Run", spr_meta_p_r.name)
+        
+        # Check both custom_unit and unit
+        doc_unit = str(spr_doc_p_r.get("custom_unit") or spr_doc_p_r.get("unit") or "").strip()
+        
+        if unit and not is_all_units:
+            # Specific unit selected - filter case insensitively
+            if doc_unit.lower() != unit.lower():
+                continue
+        else:
+            # All units: skip any workstation with 'unassigned' in the name
+            if "unassigned" in doc_unit.lower():
+                continue
+                
+        # Use exact table/column names confirmed from SPR doc debug
+        fabric_picks = spr_doc_p_r.get("fabric_batch_picks") or []
+        
+        for pick in fabric_picks:
+            ic = pick.get("rm_item") or pick.get("item_code") or pick.get("item")
+            if not ic: continue
+            qty = float(pick.get("qty") or pick.get("qty_kg") or 0)
+            if qty <= 0: continue
+            ig = frappe.db.get_value("Item", ic, "item_group")
+            
+            if ig and "product" in str(ig).strip().lower():
+                fg_consumption_list_v_r.append({
+                    "item_code": ic,
+                    "item_name": pick.get("item_name") or frappe.db.get_value("Item", ic, "item_name") or ic,
+                    "batch": pick.get("batch_no") or pick.get("batch") or "",
+                    "uom": frappe.db.get_value("Item", ic, "stock_uom") or "Kg",
+                    "standard_consumption": qty,
+                    "actual_consumption": ""
+                })
+            else:
+                if ic not in consumption_map_v_r:
+                    consumption_map_v_r[ic] = {
+                        "item_code": ic,
+                        "item_name": pick.get("item_name") or ic,
+                        "uom": frappe.db.get_value("Item", ic, "stock_uom") or "Kg",
+                        "standard_consumption": 0.0,
+                        "actual_consumption": 0.0
+                    }
+                old_c_std = consumption_map_v_r[ic]["standard_consumption"]
+                old_c_act = consumption_map_v_r[ic]["actual_consumption"]
+                consumption_map_v_r[ic]["standard_consumption"] = old_c_std + qty
+                consumption_map_v_r[ic]["actual_consumption"] = old_c_act + qty
         
         # ── Rolls & Core ──────────────────────────────────────────────
         spr_items_p_r = spr_doc_p_r.get("items") or []
@@ -57,8 +108,13 @@ else:
         for df_p_r in spr_doc_p_r.meta.get_table_fields():
             fn_p_r = df_p_r.fieldname.lower()
             rows_p_r = spr_doc_p_r.get(df_p_r.fieldname) or []
+            options_p_r = ""
+            try:
+                options_p_r = df_p_r.options or ""
+            except Exception:
+                pass
             
-            if "polybag" in fn_p_r:
+            if "polybag" in fn_p_r or options_p_r == "Shift Polybag Detail":
                 for pb_p_r in rows_p_r:
                     pbi_p_r = pb_p_r.get("polybag_item") or pb_p_r.get("item_code")
                     pbq_p_r = float(pb_p_r.get("quantity_kgs") or pb_p_r.get("qty") or 0)
@@ -68,6 +124,16 @@ else:
                             polybag_totals_v_r[pbi_p_r] = {"quantity": 0.0, "uom": pbu_p_r}
                         old_pb_q = polybag_totals_v_r[pbi_p_r]["quantity"]
                         polybag_totals_v_r[pbi_p_r]["quantity"] = old_pb_q + pbq_p_r
+            elif "bag_packing" in fn_p_r or "bag_consumable" in fn_p_r or options_p_r == "Bag Packing Detail":
+                for bc_p_r in rows_p_r:
+                    bci_p_r = bc_p_r.get("item") or bc_p_r.get("item_code")
+                    bcq_p_r = float(bc_p_r.get("quantity_kgs") or bc_p_r.get("qty") or 0)
+                    bcu_p_r = bc_p_r.get("uom") or "Kg"
+                    if bci_p_r and bcq_p_r > 0:
+                        if bci_p_r not in bag_consumables_totals_v_r:
+                            bag_consumables_totals_v_r[bci_p_r] = {"quantity": 0.0, "uom": bcu_p_r}
+                        old_bc_q = bag_consumables_totals_v_r[bci_p_r]["quantity"]
+                        bag_consumables_totals_v_r[bci_p_r]["quantity"] = old_bc_q + bcq_p_r
             
             is_w_tab = ("waste" in fn_p_r or "wastage" in fn_p_r)
             is_r_tab = ("recycle" in fn_p_r or "consumption" in fn_p_r or "patty" in fn_p_r)
@@ -97,17 +163,22 @@ else:
                         wastage_totals_v_r[tk_v] = old_wv + wq_val
 
     production_map_v_r = {}
-    consumption_map_v_r = {}
     all_batch_nos_v_r = []
     base_batch_no_v_r = ""
 
     se_filters_p_r = {"docstatus": 1, "purpose": "Manufacture"}
-    if valid_work_orders_v_r:
-        se_filters_p_r["work_order"] = ["in", valid_work_orders_v_r]
+    stock_entries_p_r = []
+    
+    if unit and not is_all_units:
+        if valid_work_orders_v_r:
+            se_filters_p_r["work_order"] = ["in", valid_work_orders_v_r]
+            stock_entries_p_r = frappe.get_all("Stock Entry", filters=se_filters_p_r, fields=["name", "work_order", "from_warehouse", "to_warehouse", "bom_no"])
     else:
-        se_filters_p_r["posting_date"] = posting_date
-
-    stock_entries_p_r = frappe.get_all("Stock Entry", filters=se_filters_p_r, fields=["name", "work_order", "from_warehouse", "to_warehouse", "bom_no"])
+        if valid_work_orders_v_r:
+            se_filters_p_r["work_order"] = ["in", valid_work_orders_v_r]
+        else:
+            se_filters_p_r["posting_date"] = posting_date
+        stock_entries_p_r = frappe.get_all("Stock Entry", filters=se_filters_p_r, fields=["name", "work_order", "from_warehouse", "to_warehouse", "bom_no"])
     
     for se_p_r in stock_entries_p_r:
         fg_p_r_list = frappe.get_all("Stock Entry Detail", filters={"parent": se_p_r.name, "is_finished_item": 1}, fields=["item_code", "item_name", "qty", "uom", "batch_no"])
@@ -131,6 +202,10 @@ else:
                 rm_p_r_list = frappe.get_all("BOM Item", filters={"parent": bom_p_r_v}, fields=["item_code", "item_name", "qty", "stock_uom"])
                 for rm_r_p_r in rm_p_r_list:
                     rq_p_r_calc = (float(rm_r_p_r.qty) / bq_raw_v) * float(fg_r_p_r.qty)
+                    ig_ref = frappe.db.get_value("Item", rm_r_p_r.item_code, "item_group")
+                    if ig_ref and "product" in str(ig_ref).strip().lower():
+                        # Ignore FG items in BOM stock entry loop since they are handled exactly by fabric_batch_picks
+                        continue
                     if rm_r_p_r.item_code not in consumption_map_v_r:
                         consumption_map_v_r[rm_r_p_r.item_code] = {"item_code": rm_r_p_r.item_code, "item_name": rm_r_p_r.item_name, "uom": rm_r_p_r.stock_uom, "standard_consumption": 0.0, "actual_consumption": 0.0}
                     
@@ -149,6 +224,11 @@ else:
         pd_p_v_p = polybag_totals_v_r[pi_p_v]
         poly_resp_p.append({"product": pi_p_v, "item_name": frappe.db.get_value("Item", pi_p_v, "item_name") or pi_p_v, "quantity": round(pd_p_v_p["quantity"], 3), "uom": pd_p_v_p["uom"]})
     
+    bag_consumables_resp_p = []
+    for bi_p_v in bag_consumables_totals_v_r:
+        bd_p_v_p = bag_consumables_totals_v_r[bi_p_v]
+        bag_consumables_resp_p.append({"item": bi_p_v, "quantity_kgs": round(bd_p_v_p["quantity"], 3), "uom": bd_p_v_p["uom"]})
+    
     waste_resp_p = []
     for wk_p_v in wastage_totals_v_r:
         qv_p_w_f = wastage_totals_v_r[wk_p_v]
@@ -161,11 +241,16 @@ else:
 
     frappe.response['message'] = { 
         "production_items": list(production_map_v_r.values()), 
+        "fg_consumption_items": fg_consumption_list_v_r,
         "consumption_items": list(consumption_map_v_r.values()), 
         "base_batch_no": base_batch_no_v_r, 
         "all_batch_nos": all_batch_nos_v_r, 
         "core_consumption_items": core_resp_p, 
         "polybag_items": poly_resp_p, 
         "wastage_items": waste_resp_p, 
-        "recycle_items": recyc_resp_p 
+        "recycle_items": recyc_resp_p,
+        "bag_consumables": bag_consumables_resp_p
     }
+    
+    # Debug message to see what the server actually found
+    frappe.msgprint(f"DEBUG: Found {len(spr_list_v_r_f)} SPRs. Bag Consumables Data: {bag_consumables_resp_p}")

@@ -1,4 +1,4 @@
-﻿# Wrapped in run_all(doc) to solve RestrictedPython NameError scoping issue
+# Wrapped in run_all(doc) to solve RestrictedPython NameError scoping issue
 def run_all(doc):
                     def ensure_lh_bopp_item_and_bom(doc, row, loop_q, loop_q_code, loop_c_raw, loop_c, loop_c_code, loop_q_display, loop_c_display, loop_width_mm, selected_company_warehouse, hsn, loop_type_raw, is_rice_bag_customer=False):
                         is_metallic = "METTALIC" in loop_type_raw
@@ -58,7 +58,7 @@ def run_all(doc):
                             "NON WOVEN METTALIC BOPP LAMINATED" if is_metallic else "NON WOVEN BOPP LAMINATED"
                         )
                         slitted_type_label = (
-                            "NON WOVEN METTALIC BOPP LAMINATED SLITTED FABRIC"
+                            "NON WOVEN METTALIC BOPP LOOP HANDLE FABRIC"
                             if is_metallic
                             else "NON WOVEN BOPP LAMINATED SLITTED FABRIC"
                         )
@@ -233,7 +233,6 @@ def run_all(doc):
                             plain_bopp_item.item_name = plain_bopp_item_name
                             plain_bopp_item.item_group = "Raw Material"
                             plain_bopp_item.stock_uom = "Kg"
-                            plain_bopp_item.has_batch_no = 1
                             plain_bopp_item.weight_uom = "Kg"
                             plain_bopp_item.valuation_method = "FIFO"
                             plain_bopp_item.gst_hsn_code = hsn
@@ -324,7 +323,7 @@ def run_all(doc):
                         if not bopp_lam_bom_no:
                             return None, None, 0
 
-                        slitted_process_code = "108"
+                        slitted_process_code = "110" if is_metallic else "108"
                         slitted_item_code = (
                             f"{nested_design_code}-{slitted_process_code}"
                             f"{bopp_q_code}{loop_c_code}"
@@ -2739,7 +2738,6 @@ def run_all(doc):
                                 plain_item.item_name = plain_name
                                 plain_item.item_group = "Raw Material"
                                 plain_item.stock_uom = "Kg"
-                                plain_item.has_batch_no = 1
                                 plain_item.weight_uom = "Kg"
                                 plain_item.valuation_method = "FIFO"
                                 plain_item.gst_hsn_code = hsn
@@ -4136,26 +4134,14 @@ def run_all(doc):
                         alt_pf_bom_no = frappe.db.get_value("BOM", {"item": alt_printed_fabric_code, "is_active": 1, "docstatus": 1}, "name")
                         if not alt_pf_bom_no:
                             try:
-                                alt_pf_bom = frappe.new_doc("BOM")
-                                alt_pf_bom.item = alt_printed_fabric_code
-                                alt_pf_bom.quantity = 1.0
-                                alt_pf_bom.is_default = 1
-                                alt_pf_bom.is_active = 1
-                                alt_pf_bom.currency = "INR"
-                                alt_pf_bom.rm_cost_as_per = "Valuation Rate"
-                                alt_pf_bom.append(
-                                    "items",
-                                    {
-                                        "item_code": alt_base_fabric_code,
-                                        "bom_no": alt_base_bom_no2,
-                                        "qty": 1.0,
-                                        "uom": "Kg",
-                                        "do_not_explode": 1,
-                                    },
+                                alt_pf_bom_no = ensure_flexo_printed_fabric_bom(
+                                    alt_printed_fabric_code,
+                                    alt_base_fabric_code,
+                                    alt_base_bom_no2,
+                                    row,
+                                    doc,
+                                    fabric_gsm=gsm_int
                                 )
-                                safe_item_insert(alt_pf_bom)
-                                alt_pf_bom.submit()
-                                alt_pf_bom_no = alt_pf_bom.name
                             except Exception:
                                 alt_pf_bom_no = None
 
@@ -4449,26 +4435,14 @@ def run_all(doc):
                                         base_fabric_bom_no = base_fabric_bom.name
 
                             if base_fabric_bom_no:
-                                printed_fabric_bom = frappe.new_doc("BOM")
-                                printed_fabric_bom.item = printed_fabric_item_code
-                                printed_fabric_bom.quantity = 1.0
-                                printed_fabric_bom.is_default = 1
-                                printed_fabric_bom.is_active = 1
-                                printed_fabric_bom.currency = "INR"
-                                printed_fabric_bom.rm_cost_as_per = "Valuation Rate"
-                                printed_fabric_bom.append(
-                                    "items",
-                                    {
-                                        "item_code": base_fabric_item_code,
-                                        "bom_no": base_fabric_bom_no,
-                                        "qty": 1.0,
-                                        "uom": "Kg",
-                                        "do_not_explode": 1,
-                                    },
+                                printed_bom_no = ensure_flexo_printed_fabric_bom(
+                                    printed_fabric_item_code,
+                                    base_fabric_item_code,
+                                    base_fabric_bom_no,
+                                    row,
+                                    doc,
+                                    fabric_gsm=gsm_int
                                 )
-                                safe_item_insert(printed_fabric_bom)
-                                printed_fabric_bom.submit()
-                                printed_bom_no = printed_fabric_bom.name
 
                             printed_bom_no = frappe.db.get_value(
                                 "BOM",
@@ -5390,27 +5364,14 @@ def run_all(doc):
                         alt_lp_bom_no = frappe.db.get_value("BOM", {"item": alt_lp_item_code, "is_active": 1, "docstatus": 1}, "name")
                         if not alt_lp_bom_no:
                             try:
-                                alt_lp_bom = frappe.new_doc("BOM")
-                                alt_lp_bom.item = alt_lp_item_code
-                                alt_lp_bom.quantity = 1.0
-                                alt_lp_bom.is_default = 1
-                                alt_lp_bom.is_active = 1
-                                alt_lp_bom.currency = "INR"
-                                alt_lp_bom.rm_cost_as_per = "Valuation Rate"
-                                alt_lp_bom_child = alt_lp_bom.append(
-                                    "items",
-                                    {
-                                        "item_code": alt_lam_item_code_lp,
-                                        "bom_no": alt_lam_bom_no_lp,
-                                        "qty": 1.0,
-                                        "uom": "Kg",
-                                        "do_not_explode": 1,
-                                    },
+                                alt_lp_bom_no = ensure_flexo_printed_fabric_bom(
+                                    alt_lp_item_code,
+                                    alt_lam_item_code_lp,
+                                    alt_lam_bom_no_lp,
+                                    row,
+                                    doc,
+                                    fabric_gsm=f_gsm
                                 )
-                                alt_lp_bom_child.item_name = alt_lam_item_name_lp
-                                safe_item_insert(alt_lp_bom)
-                                alt_lp_bom.submit()
-                                alt_lp_bom_no = alt_lp_bom.name
                             except Exception as e:
                                 frappe.msgprint(f"<b>Alternate Laminated Printed BOM Failed:</b> {str(e)}")
                                 frappe.log_error(f"Alt Laminated Printed BOM failed: {str(e)}", "Dual BOM Creation Error")
@@ -5767,17 +5728,14 @@ def run_all(doc):
                         if not lam_print_bom_no:
                             lam_print_bom_no = frappe.db.get_value("BOM", {"item": lam_print_item_code, "is_active": 1, "docstatus": 1}, "name")
                         if not lam_print_bom_no:
-                            lam_print_bom = frappe.new_doc("BOM")
-                            lam_print_bom.item = lam_print_item_code
-                            lam_print_bom.quantity = 1.0
-                            lam_print_bom.is_default = 1
-                            lam_print_bom.is_active = 1
-                            lam_print_bom.currency = "INR"
-                            lam_print_bom.rm_cost_as_per = "Valuation Rate"
-                            lam_print_bom.append("items", {"item_code": laminated_item_code, "bom_no": laminated_bom_no, "qty": 1.0, "uom": "Kg", "do_not_explode": 1})
-                            safe_item_insert(lam_print_bom)
-                            lam_print_bom.submit()
-                            lam_print_bom_no = lam_print_bom.name
+                            lam_print_bom_no = ensure_flexo_printed_fabric_bom(
+                                lam_print_item_code,
+                                laminated_item_code,
+                                laminated_bom_no,
+                                row,
+                                doc,
+                                fabric_gsm=f_gsm
+                            )
 
                         parent_bom_no = frappe.db.get_value("BOM", {"item": final_item_code, "is_active": 1, "is_default": 1, "docstatus": 1}, "name")
                         if not parent_bom_no:
@@ -13792,7 +13750,7 @@ def run_all(doc):
                                     f"{gsm_code}{mm_code}"
                                 )
                                 final_item_name = (
-                                    f"{design_name} - NON WOVEN FLEXO PRINTED FABRIC "
+                                    f"{design_code} - {design_name} - NON WOVEN FLEXO PRINTED FABRIC "
                                     f"{q_display} {c_display} {row.custom_gsm} GSM W - {width}'' ( {mm} MM )"
                                 )
 
@@ -14446,7 +14404,17 @@ def run_all(doc):
                                     # FLEXO PRINTED FABRIC BOM PATH
                                     # ====================================================
                                     if is_flexo:
-                                        pass  # No BOM needed for Flexo -> main success popup handles the notification
+                                        base_fabric_item_code = f"100{q_code}{c_code}{gsm_code}{mm_code}"
+                                        base_bom_no = ensure_nonwoven_fabric_bom_if_missing(
+                                            row, doc, selected_company_warehouse, is_rice_bag_customer,
+                                            base_fabric_item_code, int(row.custom_gsm), mm,
+                                            q, c, c_code, q_display, c_display
+                                        )
+                                        fab_bom_no = ensure_flexo_printed_fabric_bom(
+                                            final_item_code, base_fabric_item_code, base_bom_no, row, doc
+                                        )
+                                        if fab_bom_no:
+                                            bom_created = True
 
                                     # ====================================================
                                     # STANDALONE PRINTED BOPP BOM PATH
@@ -14467,7 +14435,6 @@ def run_all(doc):
                                             plain_bopp_item.item_name = plain_bopp_item_name
                                             plain_bopp_item.item_group = "Raw Material"
                                             plain_bopp_item.stock_uom = "Kg"
-                                            plain_bopp_item.has_batch_no = 1
                                             plain_bopp_item.weight_uom = "Kg"
                                             plain_bopp_item.valuation_method = "FIFO"
                                             plain_bopp_item.gst_hsn_code = hsn
@@ -15796,7 +15763,6 @@ def run_all(doc):
                                                 plain_bopp_item.item_name = plain_bopp_item_name
                                                 plain_bopp_item.item_group = "Raw Material"
                                                 plain_bopp_item.stock_uom = "Kg"
-                                                plain_bopp_item.has_batch_no = 1
                                                 plain_bopp_item.weight_uom = "Kg"
                                                 plain_bopp_item.valuation_method = "FIFO"
                                                 plain_bopp_item.gst_hsn_code = hsn
@@ -16375,7 +16341,6 @@ def run_all(doc):
                                                 plain_bopp_item.item_name   = plain_bopp_item_name
                                                 plain_bopp_item.item_group  = "Raw Material"
                                                 plain_bopp_item.stock_uom   = "Kg"
-                                                plain_bopp_item.has_batch_no = 1
                                                 plain_bopp_item.weight_uom  = "Kg"
                                                 plain_bopp_item.valuation_method = "FIFO"
                                                 plain_bopp_item.gst_hsn_code = hsn

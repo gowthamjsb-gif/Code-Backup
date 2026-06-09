@@ -1469,37 +1469,65 @@
         }
 
         // --- Loop Handle Dynamic Visibility ---
-        const items = frm.doc.items || [];
-        let hasBoppLH = false;
-        let hasNonWovenLH = false;
-        items.forEach(row => {
-            const lhp = String(row.custom_lh_process || "").toUpperCase();
-            if (lhp === "NON WOVEN FABRIC") {
-                hasNonWovenLH = true;
-            } else if (lhp.includes("BOPP")) {
-                hasBoppLH = true;
+        // ONLY ALLOW LOOP HANDLE FIELDS IF BOX BAG AND MAIN PROCESS IS BAG
+        const raw = parent_process_text_blob(frm.doc, frm).toUpperCase();
+        const bagType = (frm.doc && frm.doc.custom_type_of_bag || "").toUpperCase();
+        const mainProcess = String(frm.doc.custom_process || frm.doc.process || "").toUpperCase();
+        
+        let isBoxBag = false;
+        if (mainProcess.includes("BAG") || mainProcess.includes("SHOPPER")) {
+            if (raw.includes("BOX BAG") || raw.includes("SHOPPER") || bagType.includes("BOX BAG") || bagType.includes("SHOPPER")) {
+                isBoxBag = true;
+            } else if (frm.doc && Array.isArray(frm.doc.items)) {
+                isBoxBag = frm.doc.items.some(item => {
+                    const ip = String(item.custom_process || item.process || "").toUpperCase();
+                    return ip.includes("BOX BAG") || ip.includes("SHOPPER");
+                });
             }
-        });
-
-        if (hasBoppLH || hasNonWovenLH) {
-            baseVisible.push(
-                "custom_lh_process",
-                "custom_loop_handle_quality",
-                "custom_loop_handle_colour",
-                "custom_loop_handle_gsm",
-                "custom_loop_handle_width_inches"
-            );
         }
-        if (hasBoppLH) {
-            baseVisible.push(
-                "custom_lh_design_code",
-                "custom_lh_design_name",
-                "custom_lh_no_of_design_colour",
-                "custom_lh_design_colour",
-                "custom_lh_fabric_gsm",
-                "custom_lh_lamination_gsm",
-                "custom_lh_bopp_gsm"
-            );
+
+        if (isBoxBag) {
+            const items = frm.doc.items || [];
+            let hasBoppLH = false;
+            let hasNonWovenLH = false;
+            items.forEach(row => {
+                const lhp = String(row.custom_lh_process || "").toUpperCase();
+                if (lhp === "NON WOVEN FABRIC") {
+                    hasNonWovenLH = true;
+                } else if (lhp.includes("BOPP")) {
+                    hasBoppLH = true;
+                }
+            });
+
+            if (hasBoppLH || hasNonWovenLH) {
+                baseVisible.push(
+                    "custom_lh_process",
+                    "custom_loop_handle_quality",
+                    "custom_loop_handle_colour",
+                    "custom_loop_handle_gsm",
+                    "custom_loop_handle_width_inches"
+                );
+            }
+            if (hasBoppLH) {
+                baseVisible.push(
+                    "custom_lh_design_code",
+                    "custom_lh_design_name",
+                    "custom_lh_no_of_design_colour",
+                    "custom_lh_design_colour",
+                    "custom_lh_fabric_gsm",
+                    "custom_lh_lamination_gsm",
+                    "custom_lh_bopp_gsm"
+                );
+            }
+        } else {
+            // Remove any loop handle fields that might have leaked from modes or defaults
+            const denyLH = new Set([
+                "custom_lh_process", "custom_loop_handle_quality", "custom_loop_handle_colour",
+                "custom_loop_handle_gsm", "custom_loop_handle_width_inches", "custom_lh_design_code",
+                "custom_lh_design_name", "custom_lh_no_of_design_colour", "custom_lh_design_colour",
+                "custom_lh_fabric_gsm", "custom_lh_lamination_gsm", "custom_lh_bopp_gsm"
+            ]);
+            baseVisible = baseVisible.filter(fn => !denyLH.has(fn));
         }
 
         return baseVisible;
@@ -2642,7 +2670,9 @@
             scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});
         },
         custom_type_of_lamination(frm) {
-            scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});
+            setTimeout(() => {
+                scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});
+            }, 500);
         },
         custom_lamination_side(frm) {
             scheduleApplyItemsGrid(frm, frm._qn_last_grid_opts || {});

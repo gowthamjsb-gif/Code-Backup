@@ -29,20 +29,21 @@ if stock_entry:
 # --- Full Day / All Units support ---
 FULL_DAY_SHIFTS = ["Day Shift", "Night Shift"]
 is_full_day = (shift == "Full Day")
-is_all_units = (unit == "All Units")
+is_all_units = (not unit or unit == "All Units")
 
 # 1. Fetch matching submitted Shaft Production Runs
 filters = {
-    "docstatus": 1,
-    "run_date": posting_date,
+    "docstatus": 1
 }
-if is_full_day:
-    filters["shift"] = ["in", FULL_DAY_SHIFTS]
-else:
-    filters["shift"] = shift
 
-if unit and not is_all_units:
-    filters["custom_unit"] = unit
+# If we are looking for a specific stock entry or work order, do NOT restrict by date/shift
+# because the Shaft Production Run might have happened on a previous day!
+if not stock_entry and not work_order:
+    filters["run_date"] = posting_date
+    if is_full_day:
+        filters["shift"] = ["in", FULL_DAY_SHIFTS]
+    else:
+        filters["shift"] = shift
 
 spr_list = frappe.get_all("Shaft Production Run", filters=filters, fields=["name"])
 
@@ -52,14 +53,28 @@ seen_rolls = set()
 for spr in spr_list:
     doc = frappe.get_doc("Shaft Production Run", spr.name)
     
+    # Only filter by unit if we are NOT looking for a specific stock entry / work order
+    if not stock_entry and not work_order:
+        if unit and not is_all_units:
+            doc_unit = doc.get("unit") or doc.get("custom_unit")
+            if doc_unit != unit:
+                continue
+    
     rows = doc.get("items") or []
     for row in rows:
         row_wo = row.get("work_order")
         
-        # If stock_entry was given, filter strictly by batch_no
-        if allowed_batch_nos is not None:
+        # If stock_entry was given, filter strictly by batch_no (only if we actually found batches!)
+        if allowed_batch_nos:
             r_batch = row.get("batch_no")
-            if r_batch not in allowed_batch_nos:
+            is_match = False
+            if r_batch:
+                for ab in allowed_batch_nos:
+                    # Match exact batch, or bundled child batch (e.g., Parent JS-123, Child JS-123/1)
+                    if r_batch == ab or r_batch.startswith(ab + "/") or r_batch.startswith(ab + "-"):
+                        is_match = True
+                        break
+            if not is_match:
                 continue
         else:
             # Fallback: filter by work_order if provided
@@ -70,6 +85,8 @@ for spr in spr_list:
         row_item = row.get("item_code") or row.get("custom_item_code")
         if not row_item and row_wo:
             row_item = frappe.db.get_value("Work Order", row_wo, "production_item")
+            
+        row_item_name = frappe.db.get_value("Item", row_item, "item_name") if row_item else ""
         
         # Filter by item_code if also provided
         if item_code and row_item != item_code:
@@ -83,13 +100,18 @@ for spr in spr_list:
             "roll_no": r_no,
             "batch_no": row.get("batch_no") or r_no,
             "item_code": row_item,
+            "item_name": row_item_name,
             "quality": row.get("quality") or row.get("custom_quality") or "Unknown",
             "colour": row.get("color") or row.get("colour") or row.get("custom_color") or "Unknown",
             "net_weight": float(row.get("net_weight") or row.get("net_wt") or 0),
             "gross_weight": float(row.get("gross_weight") or row.get("gross_wt") or 0),
             "meter_roll": float(row.get("meter_roll") or row.get("meter_per_roll") or 0),
+            "custom_achieved_bag_pcs": float(row.get("custom_achieved_bag_pcs") or 0),
             "party_code": row.get("party_code") or row.get("custom_party_code") or doc.get("party_code"),
-            "produced_qty": float(row.get("net_weight") or row.get("net_wt") or 0)
+            "produced_qty": float(row.get("net_weight") or row.get("net_wt") or 0),
+            "run_date": doc.get("run_date"),
+            "shift": doc.get("shift"),
+            "unit": doc.get("unit") or doc.get("custom_unit")
         }
         
         k = (spr.name, r_no)

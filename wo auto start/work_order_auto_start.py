@@ -19,7 +19,7 @@ if doc.production_plan:
             "unit2",
             "unit3",
             "unit4",
-        )
+        )   
 
         # 1. Set Default Warehouses (Update object directly so child items can inherit)
         # Avoid calling doc.save() inside After Insert to prevent recursive validation errors
@@ -318,8 +318,12 @@ if doc.production_plan:
                             frappe.msgprint(f"⚠️ Stock Entry failed to create for Work Order <b>{doc.name}</b>. Check Error Log.", indicator="orange")
                     else:
                         frappe.msgprint(f"Warning: No items found to transfer for {doc.name}.")
-    except SystemExit:
-        pass
+    except ValueError as ve:
+        if str(ve) == "STOP_SCRIPT":
+            pass
+        else:
+            frappe.log_error(title=f"Auto Start Error for WO {doc.name}", message=str(ve))
+            frappe.msgprint(f"⚠️ Auto-start encountered an error for <b>{doc.name}</b>. It was created, but please verify manually.", indicator="orange")
     except Exception as e:
         frappe.log_error(title=f"Auto Start Error for WO {doc.name}", message=str(e))
         frappe.msgprint(f"⚠️ Auto-start encountered an error for <b>{doc.name}</b>. It was created, but please verify manually.", indicator="orange")

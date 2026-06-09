@@ -23,6 +23,17 @@ frappe.ui.form.on('Shaft Production Run Item', {
     }
 });
 
+const CBM_EXCLUDED_MACHINES = [
+    'TTT- L3 - OYANG C900 BAG MAKING LINE',
+    'TTT- L2 - OYANG C700 BAG MAKING LINE',
+    'TTT- L1 - OYANG C700 BAG MAKING LINE',
+    'VTP-L1 LEADER OYANG MACHINE',
+    'VTP-L2 LEADER ZX MACHINE',
+    'JVE-L3 B700 BAG MAKING MACHINE',
+    'JVE-L2 B700 BAG MAKING MACHINE',
+    'JVE-L1 B700 BAG MAKING MACHINE'
+];
+
 /**
  * Perform the CBM calculation.
  * @param {object} frm The main form object.
@@ -30,6 +41,10 @@ frappe.ui.form.on('Shaft Production Run Item', {
  * @param {string} [cdn] The child record name.
  */
 function calculate_cbm(frm, cdt, cdn) {
+    if (frm.doc && CBM_EXCLUDED_MACHINES.includes(frm.doc.custom_unit)) {
+        return;
+    }
+
     let doc = cdn ? locals[cdt][cdn] : frm.doc;
     
     // Ensure both inputs exist to avoid NaN results

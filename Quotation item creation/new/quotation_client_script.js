@@ -647,13 +647,26 @@
         "custom_purchase_quality_name"
     ]);
 
-    function getQuotationLaminationSideOptions(frm) {
+    function getQuotationLaminationSideOptions(frm, forRow) {
         var process = "";
-        if (frm && frm.doc && (frm.doc.custom_process || frm.doc.process)) {
-            process = (frm.doc.custom_process || frm.doc.process).toString().toLowerCase();
+        var laminationType = "";
+
+        if (forRow) {
+            process = (forRow.custom_process || forRow.process || "").toString().toLowerCase();
+        } else {
+            if (frm && frm.doc && (frm.doc.custom_process || frm.doc.process)) {
+                process = (frm.doc.custom_process || frm.doc.process).toString().toLowerCase();
+            }
+            if (frm && frm.doc && frm.doc.custom_type_of_lamination) {
+                laminationType = frm.doc.custom_type_of_lamination.toString().toLowerCase();
+            }
         }
 
         var showSingleDouble = false;
+
+        if (laminationType.indexOf("bopp") !== -1) {
+            showSingleDouble = true;
+        }
 
         if ((process.indexOf("bopp") !== -1 && (process.indexOf("laminat") !== -1 || process.indexOf("lamination") !== -1)) || process.indexOf("bopp roto") !== -1 || process.indexOf("bopp-roto") !== -1 || process.indexOf("mettalic roto") !== -1 || process.indexOf("metallic roto") !== -1 || process.indexOf("mettalic-roto") !== -1 || process.indexOf("metallic-roto") !== -1) {
             showSingleDouble = true;
@@ -661,23 +674,6 @@
         var isDCutOrWCutOrMaking = process.indexOf("d cut") !== -1 || process.indexOf("d-cut") !== -1 || process.indexOf("w cut") !== -1 || process.indexOf("w-cut") !== -1 || process.indexOf("bag making") !== -1;
         if (process.indexOf("bopp box bag") !== -1 || process.indexOf("metallic bopp") !== -1 || process.indexOf("cooler bopp") !== -1 || (process.indexOf("bag") !== -1 && !isDCutOrWCutOrMaking)) {
             showSingleDouble = true;
-        }
-
-        if (frm && frm.doc && frm.doc.items && frm.doc.items.length) {
-            for (var i = 0; i < frm.doc.items.length; i++) {
-                var row = frm.doc.items[i];
-                var rProcess = "";
-                if (row && (row.custom_process || row.process)) {
-                    rProcess = (row.custom_process || row.process).toString().toLowerCase();
-                }
-                if ((rProcess.indexOf("bopp") !== -1 && (rProcess.indexOf("laminat") !== -1 || rProcess.indexOf("lamination") !== -1)) || rProcess.indexOf("bopp roto") !== -1 || rProcess.indexOf("bopp-roto") !== -1 || rProcess.indexOf("mettalic roto") !== -1 || rProcess.indexOf("metallic roto") !== -1 || rProcess.indexOf("mettalic-roto") !== -1 || rProcess.indexOf("metallic-roto") !== -1) {
-                    showSingleDouble = true;
-                }
-                var isRowDCutOrWCutOrMaking = rProcess.indexOf("d cut") !== -1 || rProcess.indexOf("d-cut") !== -1 || rProcess.indexOf("w cut") !== -1 || rProcess.indexOf("w-cut") !== -1 || rProcess.indexOf("bag making") !== -1;
-                if (rProcess.indexOf("bopp box bag") !== -1 || rProcess.indexOf("metallic bopp") !== -1 || rProcess.indexOf("cooler bopp") !== -1 || (rProcess.indexOf("bag") !== -1 && !isRowDCutOrWCutOrMaking)) {
-                    showSingleDouble = true;
-                }
-            }
         }
 
         if (showSingleDouble) {
@@ -1780,7 +1776,7 @@
         if (!grid_row || !grid_row.grid || !grid_row.grid.df || grid_row.grid.df.fieldname !== "items") return;
         const row = grid_row.doc || {};
         if (!isLaminationEditableRow(frm, row)) return;
-        const laminationOptions = getQuotationLaminationSideOptions(frm);
+        const laminationOptions = getQuotationLaminationSideOptions(frm, row);
 
         QUOTATION_ITEM_FORCE_EDITABLE_FIELDS.forEach(fieldname => {
             try {
@@ -1905,6 +1901,27 @@
     // ==========================================================
     frappe.ui.form.on("Quotation", {
         setup: function (frm) {
+            // Fix Frappe's address_query bug when doc.customer is empty.
+            // When a user selects a value in a Select field (like Type of Lamination),
+            // Frappe may asynchronously validate the form or previous link fields.
+            // If the standard ERPNext `customer_address` query crashes because it doesn't
+            // gracefully handle missing `doc.customer`, the unhandled promise rejection
+            // causes the form's state update to abort, making the selected dropdown value blank out!
+            if (frm.fields_dict && frm.fields_dict.customer_address) {
+                frm.set_query("customer_address", function (doc) {
+                    if (!doc || (!doc.customer && !doc.lead)) {
+                        return { filters: {} }; // Return empty filters safely instead of crashing
+                    }
+                    return {
+                        query: "frappe.contacts.doctype.address.address.address_query",
+                        filters: {
+                            link_doctype: doc.customer ? "Customer" : "Lead",
+                            link_name: doc.customer || doc.lead
+                        }
+                    };
+                });
+            }
+
             suppressQuotationItemPriceMessages();
             bindQuotationItemLaminationGridUnlock(frm);
             // Register the query exactly once on setup. It will run dynamically whenever the user clicks the Quality dropdown.
@@ -1986,121 +2003,111 @@
         },
 
         _apply_child_process_from_parent: function (frm) {
-            let selected_parent_process = (frm.doc.custom_process || "").toLowerCase();
-            let parent_process = (selected_parent_process || frm.doc.process || "").toLowerCase();
-            let parent_side = (frm.doc.custom_lamination_side || "").toLowerCase();
-            let type_of_printing = (frm.doc.custom_type_of_printing || "").toLowerCase();
-            let lamination_type = (frm.doc.custom_type_of_lamination || "").toLowerCase();
-            let is_bopp = lamination_type.includes("bopp") || parent_process.includes("bopp") || parent_side.includes("bopp") || parent_process.includes("mettalic roto") || parent_process.includes("metallic roto");
+            try {
+                let selected_parent_process = (frm.doc.custom_process || "").toLowerCase();
+                let parent_process = (selected_parent_process || frm.doc.process || "").toLowerCase();
+                let parent_side = (frm.doc.custom_lamination_side || "").toLowerCase();
+                let type_of_printing = (frm.doc.custom_type_of_printing || "").toLowerCase();
+                let lamination_type = (frm.doc.custom_type_of_lamination || "").toLowerCase();
+                let is_bopp = lamination_type.includes("bopp") || parent_process.includes("bopp") || parent_side.includes("bopp") || parent_process.includes("mettalic roto") || parent_process.includes("metallic roto");
 
-            let is_bopp_lam_slit = is_bopp && parent_process.includes("laminat") && (parent_process.includes("slitted") || parent_process.includes("slitting"));
-            let is_bopp_lam_sheet = is_bopp && (parent_process.includes("sheet") || parent_process.includes("cutting")) && (parent_process.includes("laminat") || lamination_type.length > 0);
-            let is_lam_print_sheet = parent_process.includes("laminat") && parent_process.includes("printed") && parent_process.includes("sheet");
-            let is_lam_print = !is_lam_print_sheet && parent_process.includes("laminat") && parent_process.includes("printed");
-            let is_lam_slit = !is_bopp && parent_process.includes("laminat") && (parent_process.includes("slitted") || parent_process.includes("slitting"));
-            let is_lam_sheet = !is_bopp && !is_lam_print_sheet && (parent_process.includes("sheet") || parent_process.includes("cutting")) && (parent_process.includes("laminat") || lamination_type.includes("plain"));
-            let is_printed_sheet = !is_lam_print_sheet && parent_process.includes("sheet") && (parent_process.includes("print") || type_of_printing.includes("flexo"));
-            let has_parent_process = !!(selected_parent_process.trim() || parent_process.trim());
-            let lamination_side_options = getQuotationLaminationSideOptions(frm);
-            let is_bopp_lam_sheet_cutting = is_bopp && (
-                parent_process.includes("sheet cutting")
-                || (parent_process.includes("sheet") && parent_process.includes("cutting"))
-            );
-            if (is_bopp_lam_sheet_cutting) {
-                is_bopp_lam_sheet = true;
-                is_bopp_lam_slit = false;
-            } else {
-                is_bopp_lam_slit = is_bopp_lam_slit || (lamination_side_options.includes("Single Side Lamination") && !is_bopp_lam_sheet);
-            }
-            restrictQuotationItemLaminationSideOptions(frm, lamination_side_options);
-            forceEditableQuotationItemLaminationFields(frm);
-
-            // Show/hide custom_type_of_printing based on parent process
-            let is_printing = parent_process.includes("printing");
-            frm.set_df_property("custom_type_of_printing", "hidden", is_printing ? 0 : 1);
-            frm.refresh_field("custom_type_of_printing");
-
-            if (frm.fields_dict.custom_lamination_side && frm.fields_dict.custom_lamination_side.df) {
-                if (frm._qn_original_lamination_side_options === undefined) {
-                    frm._qn_original_lamination_side_options = frm.fields_dict.custom_lamination_side.df.options || "";
-                }
-                if (is_bopp || is_bopp_lam_slit || is_bopp_lam_sheet) {
-                    frm.set_df_property("custom_lamination_side", "options", lamination_side_options);
-                    if (parent_side && !parent_side.includes("single") && !parent_side.includes("double")) {
-                        frm.set_value("custom_lamination_side", "");
-                    }
-                } else if (is_lam_print || is_lam_print_sheet || is_lam_slit || is_lam_sheet) {
-                    frm.set_df_property("custom_lamination_side", "options", "Inner Lamination\nOuter Lamination");
-                    if (parent_side && !parent_side.includes("inner") && !parent_side.includes("outer")) {
-                        frm.set_value("custom_lamination_side", "");
-                    }
+                let is_bopp_lam_slit = is_bopp && parent_process.includes("laminat") && (parent_process.includes("slitted") || parent_process.includes("slitting"));
+                let is_bopp_lam_sheet = is_bopp && (parent_process.includes("sheet") || parent_process.includes("cutting")) && (parent_process.includes("laminat") || lamination_type.length > 0);
+                let is_lam_print_sheet = parent_process.includes("laminat") && parent_process.includes("printed") && parent_process.includes("sheet");
+                let is_lam_print = !is_lam_print_sheet && parent_process.includes("laminat") && parent_process.includes("printed");
+                let is_lam_slit = !is_bopp && parent_process.includes("laminat") && (parent_process.includes("slitted") || parent_process.includes("slitting"));
+                let is_lam_sheet = !is_bopp && !is_lam_print_sheet && (parent_process.includes("sheet") || parent_process.includes("cutting")) && (parent_process.includes("laminat") || lamination_type.includes("plain"));
+                let is_printed_sheet = !is_lam_print_sheet && parent_process.includes("sheet") && (parent_process.includes("print") || type_of_printing.includes("flexo"));
+                let has_parent_process = !!(selected_parent_process.trim() || parent_process.trim());
+                let lamination_side_options = getQuotationLaminationSideOptions(frm);
+                let is_bopp_lam_sheet_cutting = is_bopp && (
+                    parent_process.includes("sheet cutting")
+                    || (parent_process.includes("sheet") && parent_process.includes("cutting"))
+                );
+                if (is_bopp_lam_sheet_cutting) {
+                    is_bopp_lam_sheet = true;
+                    is_bopp_lam_slit = false;
                 } else {
-                    frm.set_df_property("custom_lamination_side", "options", frm._qn_original_lamination_side_options);
+                    is_bopp_lam_slit = is_bopp_lam_slit || (lamination_side_options.includes("Single Side Lamination") && !is_bopp_lam_sheet);
                 }
-                frm.refresh_field("custom_lamination_side");
-            }
+                restrictQuotationItemLaminationSideOptions(frm, lamination_side_options);
+                forceEditableQuotationItemLaminationFields(frm);
 
-            // Show design fields only for BOPP Lamination or Printing processes
-            let is_bopp_lam = is_bopp && parent_process.includes("laminat");
-            let has_printed_child = (frm.doc.items || []).some(row => {
-                const p = (row.custom_process || row.process || "").toUpperCase();
-                return p.includes("PRINTED") || p.includes("COLORED BOPP") || p.includes("METALLIC") || p.includes("COOLER");
-            });
-            let show_design_fields = is_bopp_lam || is_printing || is_lam_print || is_lam_print_sheet || is_bopp_lam_slit || is_bopp_lam_sheet || is_printed_sheet || has_printed_child;
+                // Show/hide custom_type_of_printing based on parent process
+                let is_printing = parent_process.includes("printing");
+                frm.set_df_property("custom_type_of_printing", "hidden", is_printing ? 0 : 1);
+                frm.refresh_field("custom_type_of_printing");
 
-            // If quotation_grid_visibility.js is disabled, keep the Items grid fully visible.
-            if (frappe.quotation_grid_visibility && typeof frappe.quotation_grid_visibility.applyItemsGrid === "function") {
-                frappe.quotation_grid_visibility.applyItemsGrid(frm, { show_design_fields });
-            } else {
-                showAllQuotationItemGridColumns(frm);
-                setTimeout(() => showAllQuotationItemGridColumns(frm), 350);
-                setTimeout(() => showAllQuotationItemGridColumns(frm), 900);
-            }
+                // Removing dynamic option restriction on the parent's custom_lamination_side 
+                // because it clashes with user selections like "BOPP Lamination" which might be contained in that same field.
 
-            let target_process = deriveChildProcessFromParent(frm);
-
-            if (has_parent_process && target_process) {
-                (frm.doc.items || []).forEach(row => {
-                    if (quotationRowProcessIsLocked(row) && !shouldForceDCutChildProcess(row, target_process)) {
-                        return;
-                    }
-                    if (row.item_code === "CUSTOM-FABRIC" || !row.item_code) {
-                        if (row.custom_process !== target_process) {
-                            frappe.model.set_value(row.doctype, row.name, "custom_process", target_process);
-                        }
-                        setTimeout(() => applyBagRowDesignDefaults(frm, row.doctype, row.name), 80);
-                    }
+                // Show design fields only for BOPP Lamination or Printing processes
+                let is_bopp_lam = is_bopp && parent_process.includes("laminat");
+                let has_printed_child = (frm.doc.items || []).some(row => {
+                    const p = (row.custom_process || row.process || "").toUpperCase();
+                    return p.includes("PRINTED") || p.includes("COLORED BOPP") || p.includes("METALLIC") || p.includes("COOLER");
                 });
+                let show_design_fields = is_bopp_lam || is_printing || is_lam_print || is_lam_print_sheet || is_bopp_lam_slit || is_bopp_lam_sheet || is_printed_sheet || has_printed_child;
+
+                // If quotation_grid_visibility.js is disabled, keep the Items grid fully visible.
+                if (frappe.quotation_grid_visibility && typeof frappe.quotation_grid_visibility.applyItemsGrid === "function") {
+                    frappe.quotation_grid_visibility.applyItemsGrid(frm, { show_design_fields });
+                } else {
+                    showAllQuotationItemGridColumns(frm);
+                    setTimeout(() => showAllQuotationItemGridColumns(frm), 350);
+                    setTimeout(() => showAllQuotationItemGridColumns(frm), 900);
+                }
+
+                let target_process = deriveChildProcessFromParent(frm);
+
+                if (has_parent_process && target_process) {
+                    (frm.doc.items || []).forEach(row => {
+                        if (quotationRowProcessIsLocked(row) && !shouldForceDCutChildProcess(row, target_process)) {
+                            return;
+                        }
+                        if (row.item_code === "CUSTOM-FABRIC" || !row.item_code) {
+                            if (row.custom_process !== target_process) {
+                                frappe.model.set_value(row.doctype, row.name, "custom_process", target_process);
+                            }
+                            setTimeout(() => applyBagRowDesignDefaults(frm, row.doctype, row.name), 80);
+                        }
+                    });
+                }
+                setTimeout(() => forceEditableQuotationItemLaminationFields(frm), 250);
+            } catch (err) {
+                console.error("Error in _apply_child_process_from_parent:", err);
+                if (typeof frappe !== "undefined" && frappe.msgprint) {
+                    frappe.msgprint("An error occurred while applying process rules. Check browser console.");
+                }
             }
-            setTimeout(() => forceEditableQuotationItemLaminationFields(frm), 250);
         },
 
         custom_process: function (frm) {
             toggleBagMakingFields(frm);
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 50);
         },
 
         process: function (frm) {
             toggleBagMakingFields(frm);
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 50);
         },
 
         custom_type_of_bag: function (frm) {
             toggleBagMakingFields(frm);
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 50);
             applyPlainBoxBagDesignDefaultsToRows(frm);
         },
 
         custom_type_of_printing: function (frm) {
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 50);
         },
 
         custom_lamination_side: function (frm) {
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 50);
         },
 
         custom_type_of_lamination: function (frm) {
-            frm.events._apply_child_process_from_parent(frm);
+            setTimeout(() => { if (frm.events._apply_child_process_from_parent) frm.events._apply_child_process_from_parent(frm); }, 500);
         },
 
         company: function (frm) {
@@ -3143,7 +3150,7 @@
                     setTimeout(function () {
                         const currentQty = parseFloat(row.qty) || 0;
                         if (currentQty === 0) {
-                            frappe.model.set_value(cdt, cdn, "qty", 0);
+                            frappe.model.set_value(cdt, cdn, "qty", 1);
                         }
                     }, 600);
                     [650, 1400, 2500].forEach(function (ms) {

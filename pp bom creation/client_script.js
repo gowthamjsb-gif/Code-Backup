@@ -534,7 +534,7 @@ async function process_item_smart_bom(frm, index) {
                     ad_rows,
                     mb_rows,
                     mb_ldr: parseFloat(v.qty_mb) || 0,
-                    force_new: 1,
+                    force_new: 0,
                     version: SMART_BOM_CLIENT_VERSION
                 });
 
@@ -543,7 +543,7 @@ async function process_item_smart_bom(frm, index) {
                     args: {
                         "production_plan": frm.doc.name, "item_code": row.item_code, "po_item_index": index,
                         "quality": v.quality,
-                        "force_new": 1,
+                        "force_new": 0,
                         // Legacy fallback args for server-side fail-safe path
                         "item_pp_1": pp1.item_code || "",
                         "qty_pp_1": pp1.qty || 0,
@@ -570,9 +570,13 @@ async function process_item_smart_bom(frm, index) {
                 });
                 console.log("create_smart_bom response", r);
                 if (r.message && !r.message.startsWith("Error")) {
-                    // Update ONLY the selected row (avoid wrong updates when item repeats)
-                    frappe.model.set_value(row.doctype, row.name, 'bom_no', r.message);
-                    frappe.model.set_value(row.doctype, row.name, 'custom_quality', v.quality);
+                    // Update ALL rows with the same item code
+                    frm.doc.po_items.forEach(r_item => {
+                        if (r_item.item_code === row.item_code) {
+                            frappe.model.set_value(r_item.doctype, r_item.name, 'bom_no', r.message);
+                            frappe.model.set_value(r_item.doctype, r_item.name, 'custom_quality', v.quality);
+                        }
+                    });
                     if (frm.fields_dict && frm.fields_dict.consider_projected_qty) {
                         frm.set_value('consider_projected_qty', 0);
                     }
@@ -942,7 +946,7 @@ async function bulk_set_recipes(frm) {
                         ad_rows,
                         mb_rows,
                         mb_ldr: parseFloat(v.qty_ldr) || 0,
-                        force_new: 1,
+                        force_new: 0,
                         version: SMART_BOM_CLIENT_VERSION
                     });
                     let resp = await frappe.call({
@@ -950,7 +954,7 @@ async function bulk_set_recipes(frm) {
                         args: {
                             "production_plan": frm.doc.name, "item_code": row.item_code, "po_item_index": items.indexOf(row),
                             "quality": v.quality,
-                            "force_new": 1,
+                            "force_new": 0,
                             // Legacy fallback args for server-side fail-safe path
                             "item_pp_1": pp1.item_code || "",
                             "qty_pp_1": pp1.qty || 0,
@@ -1495,12 +1499,16 @@ async function open_lamination_dialog(frm, row, index) {
                     item_code: row.item_code,
                     lam_side: lam_side_val,
                     lam_items: JSON.stringify(lam_items),
-                    force_new: 1
+                    force_new: 0
                 }
             });
             console.log("create_lamination_bom response", r);
             if (r.message && !r.message.startsWith('Error')) {
-                frappe.model.set_value(row.doctype, row.name, 'bom_no', r.message);
+                frm.doc.po_items.forEach(r_item => {
+                    if (r_item.item_code === row.item_code) {
+                        frappe.model.set_value(r_item.doctype, r_item.name, 'bom_no', r.message);
+                    }
+                });
                 if (frm.fields_dict && frm.fields_dict.consider_projected_qty) frm.set_value('consider_projected_qty', 0);
                 frm.clear_table('mr_items');
                 await frm.save();
@@ -1730,7 +1738,7 @@ async function bulk_lamination_dialog(frm, lam_rows) {
                         item_code: row.item_code,
                         lam_side: (row.custom_lamination_side || lam_side_val || '').trim(),
                         lam_items: JSON.stringify(row_lam_items),
-                        force_new: 1
+                        force_new: 0
                     }
                 });
                 console.log(`create_lamination_bom bulk for ${row.item_code}`, resp);
@@ -1815,11 +1823,15 @@ async function assign_slitting_bom(frm, row) {
     try {
         let resp = await frappe.call({
             method: 'create_lamination_bom',
-            args: { item_code: row.item_code, lam_side: 'Slitting', lam_items: JSON.stringify([{ item_code: fab_code, qty: 1.0 }]), force_new: 1 }
+            args: { item_code: row.item_code, lam_side: 'Slitting', lam_items: JSON.stringify([{ item_code: fab_code, qty: 1.0 }]), force_new: 0 }
         });
         if (resp.message && !resp.message.startsWith('Error')) {
-            frappe.model.set_value(row.doctype, row.name, 'bom_no', resp.message);
-            frappe.model.set_value(row.doctype, row.name, 'custom_base_fabric', fab_code);
+            frm.doc.po_items.forEach(r_item => {
+                if (r_item.item_code === row.item_code) {
+                    frappe.model.set_value(r_item.doctype, r_item.name, 'bom_no', resp.message);
+                    frappe.model.set_value(r_item.doctype, r_item.name, 'custom_base_fabric', fab_code);
+                }
+            });
             if (frm.fields_dict && frm.fields_dict.consider_projected_qty) frm.set_value('consider_projected_qty', 0);
             frm.clear_table('mr_items');
             await frm.save();
@@ -2034,13 +2046,17 @@ async function open_bopp_printing_dialog(frm, row, index) {
                         item_code: row.item_code,
                         lam_side: 'BOPP Printing',
                         lam_items: JSON.stringify(bom_items),
-                        force_new: 1
+                        force_new: 0
                     }
                 });
 
                 if (resp.message && !resp.message.startsWith('Error')) {
-                    frappe.model.set_value(row.doctype, row.name, 'bom_no', resp.message);
-                    frappe.model.set_value(row.doctype, row.name, 'custom_printed_bopp', bopp_code);
+                    frm.doc.po_items.forEach(r_item => {
+                        if (r_item.item_code === row.item_code) {
+                            frappe.model.set_value(r_item.doctype, r_item.name, 'bom_no', resp.message);
+                            frappe.model.set_value(r_item.doctype, r_item.name, 'custom_printed_bopp', bopp_code);
+                        }
+                    });
                     if (frm.fields_dict && frm.fields_dict.consider_projected_qty) {
                         frm.set_value('consider_projected_qty', 0);
                     }

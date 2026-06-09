@@ -1,11 +1,21 @@
 <div class=" print-header">
     <div class="row">
-        <div class="col-xs-12" style="text-align: left;">
+        <div class="col-xs-8" style="text-align: left;">
             <h2 style="margin-top:0; color: #17a2b8; font-size: 28px;"><b>W-Cut Bag Order Sheet</b></h2>
             <p style="font-size: 14px;"><strong>ID:</strong> {{ doc.name }}</p>
             <p style="font-size: 14px;"><strong>Order Code:</strong> {{ doc.custom_party_code or "" }}</p>
             <p style="font-size: 14px;"><strong>Ordered Date:</strong> {{ doc.get_formatted("posting_date") }}</p>
             <p style="font-size: 14px;"><strong>Progress:</strong> {{ doc.status }}</p>
+        </div>
+        <div class="col-xs-4">
+            {% set ns_qty = namespace(total=0) %}
+            {% for item in doc.po_items %}
+            {% set ns_qty.total = ns_qty.total + (item.planned_qty or item.qty or 0) %}
+            {% endfor %}
+            <div style="border: 2px solid #17a2b8; border-radius: 5px; padding: 10px; background-color: #f0f8fa; text-align: center; margin-top: 10px;">
+                <p style="margin: 0; font-weight: bold; font-size: 16px; color: #000;">Total Planned Qty:</p>
+                <h3 style="margin: 5px 0 0 0; color: #17a2b8; font-weight: bold; font-size: 24px;">{{ ns_qty.total | int }} {% if doc.po_items and doc.po_items[0].stock_uom %}{{ doc.po_items[0].stock_uom }}{% else %}Pieces{% endif %}</h3>
+            </div>
         </div>
     </div>
 </div>
@@ -30,9 +40,7 @@
     </table>
 </div>
 
-
 <div class="section" style="margin-top: 20px;">
-    <h4 class="section-title">Finished Goods Details</h4>
     {% set base_pp = None %}
     {% if doc.custom_custom_linked_plan %}
     {% set link_parts = doc.custom_custom_linked_plan.split(",") %}
@@ -43,132 +51,181 @@
     {% endif %}
 
     {% for row in doc.po_items %}
-    {%- set base_item = base_pp.po_items[loop.index0] if base_pp and base_pp.po_items and loop.index0 <
-        base_pp.po_items|length else None -%} {%- set b_wid=base_item.custom_width_ if base_item else "" -%} {%- set
-        c_meter=row.custom_meterperroll if row.custom_meterperroll else (base_item.custom_meterperroll if base_item
-        else "" ) -%} {#- Input Rolls -#} {%- if base_item and base_item.custom_no_of_rolls -%} {%- set
-        input_rolls=base_item.custom_no_of_rolls | int -%} {%- elif base_item and base_item.custom_no_of_rolls_ -%} {%-
-        set input_rolls=base_item.custom_no_of_rolls_ | int -%} {%- else -%} {%- set input_rolls=0 -%} {%- endif -%} {#-
-        Output Rolls -#} {%- if row.custom_no_of_rolls -%} {%- set output_rolls=row.custom_no_of_rolls | int -%} {%-
-        elif row.custom_no_of_rolls_ -%} {%- set output_rolls=row.custom_no_of_rolls_ | int -%} {%- elif row.custom_gsm
-        and row.custom_width_ and c_meter and row.planned_qty -%} {%- set g_wt=(row.custom_gsm | float *
-        row.custom_width_ | float * c_meter | float * 0.0254 / 1000) -%} {%- set output_rolls=(row.planned_qty | float /
-        g_wt) | round(0, 'ceil' ) | int if g_wt> 0 else 0 -%}
+    {% set p_sheet = None %}
+    {% set ps_row = None %}
+
+    {% if doc.custom_planning_sheet and frappe.db.exists("Planning sheet", doc.custom_planning_sheet) %}
+    {% set p_sheet = frappe.get_doc("Planning sheet", doc.custom_planning_sheet) %}
+    {% endif %}
+
+    {% if not p_sheet and base_pp and base_pp.custom_planning_sheet and frappe.db.exists("Planning sheet", base_pp.custom_planning_sheet) %}
+    {% set p_sheet = frappe.get_doc("Planning sheet", base_pp.custom_planning_sheet) %}
+    {% endif %}
+
+    {% if p_sheet %}
+    {% set ns_find = namespace(row=None) %}
+    {% for p_item in p_sheet.get("planned_items", []) %}
+    {% if p_item.item_code == row.item_code and not ns_find.row %}
+    {% set ns_find.row = p_item %}
+    {% endif %}
+    {% endfor %}
+    {% set ps_row = ns_find.row %}
+    {% endif %}
+
+    {% set trace_id = ps_row.get("custom_parent_child_trace_id") or ps_row.get("parent_child_trace_id") if ps_row else None %}
+
+    {% set ns = namespace(main_fabric=None) %}
+    {% if p_sheet and trace_id %}
+    {% for p_item in p_sheet.get("planned_items", []) %}
+    {% set item_trace_id = p_item.get("custom_parent_child_trace_id") or p_item.get("parent_child_trace_id") %}
+    {% if item_trace_id == trace_id %}
+    {% set pf = p_item.get("custom_parent_fabric") or p_item.get("parent_fabric") %}
+    {% if pf == 'Main Fabric' %}
+    {% set ns.main_fabric = p_item %}
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% set ns_base = namespace(main_fabric=None) %}
+    {% if base_pp and base_pp.po_items and trace_id %}
+    {% for b_row in base_pp.po_items %}
+    {% if b_row.get("custom_parent_child_trace_id") == trace_id %}
+    {% set b_pf = b_row.get("custom_parent_fabric") %}
+    {% if b_pf == 'Main Fabric' %}
+    {% set ns_base.main_fabric = b_row %}
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% set mf_item = ns.main_fabric %}
+    {% set mf_base = ns_base.main_fabric %}
+    {% if not mf_item and not mf_base and base_pp and base_pp.po_items %}
+    {% set mf_base = base_pp.po_items[loop.index0] if loop.index0 < base_pp.po_items|length else None %} 
+    {% endif %} 
+    
+    {%- set mf_wid=mf_base.custom_width_ if (mf_base and mf_base.custom_width_) else (mf_item.get("width_inch") or mf_item.get("custom_width_inch") or mf_item.get("custom_width") if mf_item else "") -%} 
+    {%- set mf_c_meter=mf_item.get("meter_per_roll") or mf_item.get("meter") if mf_item else (mf_base.custom_meterperroll if mf_base else "") -%} 
+    {%- if mf_base and mf_base.custom_no_of_rolls -%} {%- set mf_input_rolls=mf_base.custom_no_of_rolls | int -%} 
+    {%- elif mf_base and mf_base.custom_no_of_rolls_ -%} {%- set mf_input_rolls=mf_base.custom_no_of_rolls_ | int -%} 
+    {%- elif mf_item and mf_item.get("no_of_rolls") -%} {%- set mf_input_rolls=mf_item.get("no_of_rolls") | int -%} 
+    {%- else -%} {%- set mf_input_rolls=0 -%} {%- endif -%} 
+    {%- set mf_gsm=mf_base.custom_gsm if mf_base else (mf_item.get("gsm") or mf_item.get("custom_gsm") if mf_item else "") -%} 
+    {%- set mf_meter=mf_base.custom_meterperroll if (mf_base and mf_base.custom_meterperroll) else mf_c_meter -%} 
+    {%- set mf_quality=mf_base.custom_quality if (mf_base and mf_base.custom_quality) else (mf_item.get("quality") or mf_item.get("custom_quality") if mf_item else "") -%}
+    {%- set mf_color=mf_base.custom_color if (mf_base and mf_base.custom_color) else (mf_item.get("color") or mf_item.get("custom_color") if mf_item else "") -%} 
+    {%- set mf_qty=mf_item.qty if mf_item else (mf_base.planned_qty if mf_base else 0.0) -%} 
+    
+    {%- set item_val=row.description or row.item_name or row.item_code or "" -%} 
+    {%- set design="" -%} 
+    {%- set ext_bag_size="" -%} 
+    {%- if " - " in item_val -%} 
+        {%- set parts=item_val.split(" - ") -%}
+        {%- if parts|length >= 2 -%}
+            {%- set design = parts[0] ~ " - " ~ parts[1] -%}
         {%- else -%}
-        {%- set output_rolls = 0 -%}
+            {%- set design = item_val -%}
         {%- endif -%}
+    {%- else -%}
+        {%- set design = item_val -%}
+    {%- endif -%}
 
-        {%- set b_gsm = base_item.custom_gsm if base_item else "" -%}
-        {%- set b_meter = base_item.custom_meterperroll if (base_item and base_item.custom_meterperroll) else
-        c_meter -%}
-        {%- set row_quality = row.custom_quality or doc.custom_quality or "" -%}
-        {%- set row_color = row.custom_color or "" -%}
-        {%- set base_quality = base_item.custom_quality if (base_item and base_item.custom_quality) else row_quality
-        -%}
-        {%- set base_color = base_item.custom_color if (base_item and base_item.custom_color) else row_color -%}
+    {%- if " (" in item_val and ")" in item_val -%} 
+        {%- set size_start=item_val.find("(") -%} 
+        {%- set size_end=item_val.find(")") -%} 
+        {%- set ext_bag_size=item_val[size_start+1:size_end].strip() -%} 
+    {%- else -%}
+        {%- set ext_bag_size=row.custom_bag_size or row.custom_width_ or "" -%} 
+    {%- endif -%} 
+    
+    {%- set planned_qty_pieces=ps_row.qty if ps_row else (row.planned_qty or 0) -%} 
 
-        {%- set b_qty = 0.0 -%}
-        {%- if b_gsm and b_wid and b_meter and input_rolls -%}
-        {%- set b_qty = (b_gsm | float * b_wid | float * b_meter | float * 0.0254 / 1000) * (input_rolls | float)
-        -%}
-        {%- endif -%}
-
-        {#- Pre-compute bag size & cut length before rendering input row -#}
-        {%- set bag_size = row.custom_width_ or "" -%}
-        {%- set item_val = row.description or row.item_name or row.item_code or "" -%}
-        {%- set upper_val = item_val.upper() -%}
-        {%- if " X " in upper_val -%}
-        {%- set gsm_idx = upper_val.find(" GSM ") -%}
-        {%- if gsm_idx != -1 -%}
-        {%- set size_str = item_val[gsm_idx + 5:] -%}
-        {%- else -%}
-        {%- set size_str = item_val -%}
-        {%- endif -%}
-        {%- set bag_size = size_str.split(" (")[0].replace("S -", "").strip() -%}
-        {%- endif -%}
-
-        {%- set b_wid_float = b_wid | float(0) -%}
-        {%- set clean_size = bag_size.upper().replace("W", "").replace("H", "").replace('"', "").strip() -%}
-        {%- set parts = clean_size.split(" X ") -%}
-        {%- set dim1 = parts[0].strip() | float(0) if parts|length > 0 else 0 -%}
-        {%- set dim2 = parts[1].strip() | float(0) if parts|length > 1 else 0 -%}
-
-        {%- set cut_length_in = 0 -%}
-        {%- if b_wid_float == dim1 -%}
-        {%- set cut_length_in = dim2 -%}
-        {%- elif b_wid_float == dim2 -%}
-        {%- set cut_length_in = dim1 -%}
-        {%- else -%}
-        {%- set cut_length_in = dim1 -%}
-        {%- endif -%}
-
-        <table class="table table-bordered table-condensed"
-            style="border: 2px solid #000; margin-bottom: 25px; border-collapse: collapse;">
-            <tbody>
-                <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
-                    <td style="border: 1px solid #000; width: 80px; font-weight: bold;"></td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Quality</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Color</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
-                    <td style="border: 1px solid #000; font-weight: bold; width: 120px;">Roll Size</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Cut Length</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Length/Roll<br>(Mtrs)</td>
-                    <td style="border: 1px solid #000; font-weight: bold; width: 60px;">No. of Rolls</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Kgs)</td>
-                </tr>
-                <tr>
-                    <td
-                        style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">
-                        Input</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ base_quality }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ base_color }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ b_gsm }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ b_wid ~ '"' if b_wid else "-" }}</td>
-                    <td style="border: 1px solid #000; text-align: center; font-weight: bold;">
-                        {{ (cut_length_in | int) ~ '"' if cut_length_in > 0 else "-" }}
-                    </td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ b_meter }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ input_rolls }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ "%.2f" | format(b_qty) if b_qty > 0
-                        else "-" }}</td>
-                </tr>
-                <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
-                    <td style="border: 1px solid #000;"></td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Quality</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Color</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Bag Size</td>
-                    <td style="border: 1px solid #000; font-weight: bold;" colspan="3">No. of Bags</td>
-                    <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Kgs)</td>
-                </tr>
-                {%- set no_of_pieces = 0 -%}
-                {%- if cut_length_in > 0 -%}
-                {%- set cut_length_m = (cut_length_in * 0.0254) | round(3) -%}
-                {%- set total_input_m = (b_meter | float(0)) * (input_rolls | float(0)) -%}
-                {%- set no_of_pieces = (total_input_m * cut_length_m) | round(0, 'ceil') | int -%}
-                {%- endif -%}
-                <tr>
-                    <td
-                        style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">
-                        Output</td>
-                    <td style="border: 1px solid #000; text-align: center; font-weight: bold;">{{ row_quality }}</td>
-                    <td style="border: 1px solid #000; text-align: center; font-weight: bold;">{{ row_color }}</td>
-                    <td style="border: 1px solid #000; text-align: center;">{{ row.custom_gsm or "" }}</td>
-                    <td style="border: 1px solid #000; text-align: center; font-weight: bold;">
-                        {{ bag_size }}
-                    </td>
-                    <td style="border: 1px solid #000; text-align: center; font-size: 14px; font-weight: bold;"
-                        colspan="3">{{ no_of_pieces }}</td>
-                    <td style="border: 1px solid #000; text-align: center;"><b>{{ "%.2f" | format(row.planned_qty |
-                            float) }}</b></td>
-                </tr>
-            </tbody>
-        </table>
-        {% endfor %}
+    <table class="table table-bordered table-condensed" style="border: 2px solid #000; margin-bottom: 25px; border-collapse: collapse;">
+        <tbody>
+            <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
+                <td style="border: 1px solid #000; width: 80px; font-weight: bold;"></td>
+                <td style="border: 1px solid #000; font-weight: bold;">Quality</td>
+                <td style="border: 1px solid #000; font-weight: bold;">Color</td>
+                <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
+                <td style="border: 1px solid #000; font-weight: bold; width: 120px;">Roll Size</td>
+                <td style="border: 1px solid #000; font-weight: bold;">Length/Roll<br>(Mtrs)</td>
+                <td style="border: 1px solid #000; font-weight: bold; width: 60px;">No. of Rolls</td>
+                <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Kgs)</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">
+                    Input<br><span style="font-size: 10px;">(Main Fabric)</span></td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_quality }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_color }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_gsm }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_wid ~ '"' if mf_wid else "-" }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_meter }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ mf_input_rolls }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ "%.2f" | format(mf_qty) if mf_qty > 0 else "-" }}</td>
+            </tr>
+            <tr style="background-color: #f2f2f2; text-align: center; font-weight: normal;">
+                <td style="border: 1px solid #000;"></td>
+                <td style="border: 1px solid #000; font-weight: bold;" colspan="2">Design</td>
+                <td style="border: 1px solid #000; font-weight: bold;">GSM</td>
+                <td style="border: 1px solid #000; font-weight: bold;" colspan="3">Bag Size</td>
+                <td style="border: 1px solid #000; font-weight: bold;">Planned Qty (Pieces)</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f2f2f2; border: 1px solid #000; font-weight: bold; text-align: center;">Output</td>
+                <td style="border: 1px solid #000; text-align: center; font-weight: bold;" colspan="2">{{ design }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ row.custom_gsm or "" }}</td>
+                <td style="border: 1px solid #000; text-align: center; font-weight: bold;" colspan="3">
+                    {{ ext_bag_size }}
+                </td>
+                <td style="border: 1px solid #000; text-align: center; font-size: 14px; font-weight: bold;">
+                    {{ planned_qty_pieces | int }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    {% endfor %}
 </div>
 
-
-
+{% if doc.custom_bundle_calculation and doc.custom_packing in ["Box Packing", "Bora Packing"] %}
+<div class="section" style="margin-top: 20px;">
+    <h4 class="section-title">Packing Details</h4>
+    <table class="table table-bordered table-condensed" style="border: 2px solid #000; border-collapse: collapse; margin-bottom: 25px;">
+        <thead>
+            <tr style="background-color: #f2f2f2; text-align: center;">
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">Job ID</th>
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">Bag Size</th>
+                
+                {% if doc.custom_packing == "Box Packing" %}
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">No. of Boxes</th>
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">Custom Pcs per Box</th>
+                {% elif doc.custom_packing == "Bora Packing" %}
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">No. of Bundles</th>
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">Pkts per Bundle</th>
+                <th style="border: 1px solid #000; font-weight: bold; text-align: center;">Pcs per Packet</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for bundle in doc.custom_bundle_calculation %}
+            <tr>
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.custom_job_id or bundle.job or "" }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.bag_size or "" }}</td>
+                
+                {% if doc.custom_packing == "Box Packing" %}
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.custom_no_of_boxes | int if bundle.custom_no_of_boxes else 0 }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.custom_pcs_per_box | int if bundle.custom_pcs_per_box else 0 }}</td>
+                {% elif doc.custom_packing == "Bora Packing" %}
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.no_of_bundles | int if bundle.no_of_bundles else 0 }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.pkts_per_bundle | int if bundle.pkts_per_bundle else 0 }}</td>
+                <td style="border: 1px solid #000; text-align: center;">{{ bundle.pcs_per_packet | int if bundle.pcs_per_packet else 0 }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 <style>
     .section-title {
