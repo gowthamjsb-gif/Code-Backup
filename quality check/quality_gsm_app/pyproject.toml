@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quality_gsm_app"
+version = "0.0.1"
+description = "GSM quality testing extension for ERPNext Quality Inspection"
+authors = [{ name = "Custom", email = "admin@example.com" }]
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["quality_gsm_app*"]
+
