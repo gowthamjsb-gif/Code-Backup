@@ -8,3 +8,4 @@ quality_gsm_app.patches.v2_1.update_gsm_report_layout
 quality_gsm_app.patches.v2_2.update_gsm_report_layout_excel_style
 quality_gsm_app.patches.v2_3.enforce_field_permanence
 quality_gsm_app.patches.v2_4.fix_quality_fieldtype
+quality_gsm_app.patches.v2_5.add_custom_grid_and_expand_samples

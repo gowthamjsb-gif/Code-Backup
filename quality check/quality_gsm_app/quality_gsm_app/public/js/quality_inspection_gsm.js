@@ -3,6 +3,7 @@ frappe.ui.form.on(parentDoctype, {
     refresh(frm) {
         add_load_gsm_button(frm);
         recalc_all_sections(frm);
+        render_custom_html_grid(frm);
     },
     validate(frm) {
         recalc_all_sections(frm);
@@ -15,6 +16,7 @@ frappe.ui.form.on(parentDoctype, {
             }
         });
         recalc_all_sections(frm);
+        render_custom_html_grid(frm);
     }
 });
 });
@@ -30,7 +32,7 @@ frappe.ui.form.on(childDoctype, {
 });
 });
 
-for (let i = 1; i <= 20; i++) {
+for (let i = 1; i <= 25; i++) {
     ["Quality Checking Section"].forEach((childDoctype) => {
         frappe.ui.form.on(childDoctype, {
             [`r1_s${i}`]: function (frm, cdt, cdn) {
@@ -80,6 +82,7 @@ function add_load_gsm_button(frm) {
 
                 frm.refresh_field(sectionsField);
                 recalc_all_sections(frm);
+                render_custom_html_grid(frm);
                 frappe.show_alert({ message: __("Quality sections loaded"), indicator: "green" });
             }
         });
@@ -92,7 +95,7 @@ function recalc_section_and_parent(frm, cdt, cdn) {
     if (!row || !sectionsField) return;
     recalc_one_section(frm, row);
     recalc_parent_summary(frm);
-    frm.refresh_field(sectionsField);
+    update_dom_calculations(row);
 }
 
 function recalc_all_sections(frm) {
@@ -100,7 +103,6 @@ function recalc_all_sections(frm) {
     if (!sectionsField) return;
     (frm.doc[sectionsField] || []).forEach((row) => recalc_one_section(frm, row));
     recalc_parent_summary(frm);
-    frm.refresh_field(sectionsField);
 }
 
 function get_threshold(qualityText) {
@@ -109,7 +111,7 @@ function get_threshold(qualityText) {
 }
 
 function recalc_one_section(frm, row) {
-    const sampleCount = 20;
+    const sampleCount = 25;
     const setGsm = flt(row.representative_gsm);
     const quality = row.quality || frm.doc.quality || "";
     const threshold = get_threshold(quality);
@@ -173,3 +175,139 @@ function recalc_parent_summary(frm) {
     safe_set_value(frm, "gsm_overall_result", rows.length ? (failSections > 0 ? "FAIL" : "PASS") : "");
 }
 
+
+// -----------------------------------------------------
+// CUSTOM HTML GRID RENDERER
+// -----------------------------------------------------
+function render_custom_html_grid(frm) {
+    if (!frm.fields_dict.custom_html_grid) return;
+    const wrapper = frm.fields_dict.custom_html_grid.$wrapper;
+    wrapper.empty();
+
+    const sectionsField = get_sections_field(frm);
+    const rows = frm.doc[sectionsField] || [];
+    if (!rows.length) {
+        wrapper.html(`<div class="text-muted" style="padding: 15px;">No GSM Sections loaded. Click 'Load Quality Sections' from Shaft Production Run.</div>`);
+        return;
+    }
+
+    let html = `
+        <style>
+            .gsm-excel-grid { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; font-family: Inter, sans-serif; table-layout: fixed; }
+            .gsm-excel-grid th, .gsm-excel-grid td { border: 1px solid #d1d8dd; padding: 4px; text-align: center; overflow: hidden; }
+            .gsm-excel-grid th { background-color: #f3f3f3; font-weight: bold; }
+            .gsm-excel-grid input { width: 100%; border: none; text-align: center; font-size: 11px; background: transparent; outline: none; }
+            .gsm-excel-grid input:focus { background-color: #e2e8f0; }
+            .row-header { font-weight: bold; background-color: #f8f9fa; text-align: left !important; width: 100px; }
+            .section-wrapper { margin-bottom: 30px; overflow-x: auto; }
+            .set-gsm-col { font-weight: bold; width: 60px; }
+            .avg-col { font-weight: bold; background-color: #ecf0f1; width: 60px; }
+            .pass-diff { background-color: #eafaf1; color: #1e8449; font-weight: bold; }
+            .fail-diff { background-color: #fdedec; color: #c0392b; font-weight: bold; }
+            .s-idx-col { width: 45px; }
+        </style>
+    `;
+
+    rows.forEach((row, idx) => {
+        const quality = row.quality || frm.doc.quality || "";
+        const limit = get_threshold(quality);
+
+        html += `
+        <div class="section-wrapper">
+            <h5>Section ${idx + 1} - Set GSM: ${row.representative_gsm} | Result: <span id="res_${row.name}">${row.section_result || '-'}</span></h5>
+            <table class="gsm-excel-grid" data-row-name="${row.name}">
+                <thead>
+                    <tr>
+                        <th class="row-header">SI NO: ${idx + 1}</th>
+                        <th class="set-gsm-col">SET GSM</th>
+        `;
+        for (let i = 1; i <= 25; i++) {
+            html += `<th class="s-idx-col">S${i}</th>`;
+        }
+        html += `<th class="avg-col">AVERAGE</th></tr></thead><tbody>`;
+
+        // Row 1
+        html += `
+            <tr>
+                <td class="row-header">GSM (ROW 1)</td>
+                <td class="set-gsm-col">${row.representative_gsm}</td>
+        `;
+        for (let i = 1; i <= 25; i++) {
+            html += `<td><input type="number" class="gsm-input" data-row="${row.name}" data-field="r1_s${i}" value="${row[`r1_s${i}`] || ''}" /></td>`;
+        }
+        html += `<td class="avg-col" id="r1_avg_${row.name}">${row.r1_average || 0}</td></tr>`;
+
+        // Row 2
+        html += `
+            <tr>
+                <td class="row-header">GSM (ROW 2)</td>
+                <td class="set-gsm-col">${row.representative_gsm}</td>
+        `;
+        for (let i = 1; i <= 25; i++) {
+            html += `<td><input type="number" class="gsm-input" data-row="${row.name}" data-field="r2_s${i}" value="${row[`r2_s${i}`] || ''}" /></td>`;
+        }
+        html += `<td class="avg-col" id="r2_avg_${row.name}">${row.r2_average || 0}</td></tr>`;
+
+        // Combined Avg
+        html += `
+            <tr class="avg-col">
+                <td class="row-header">COMBINED AVG</td>
+                <td class="set-gsm-col">-</td>
+        `;
+        for (let i = 1; i <= 25; i++) {
+            html += `<td id="cmb_avg_${row.name}_${i}">${row[`s${i}_combined_avg`] || 0}</td>`;
+        }
+        html += `<td id="grand_avg_${row.name}">${row.grand_average_gsm || 0}</td></tr>`;
+
+        // Diff
+        html += `
+            <tr>
+                <td class="row-header">DIFF</td>
+                <td class="set-gsm-col">-</td>
+        `;
+        for (let i = 1; i <= 25; i++) {
+            const d = row[`s${i}_diff`];
+            const isPass = (d !== null && d !== undefined && Math.abs(d) < limit);
+            const cls = d !== undefined && d !== null ? (isPass ? 'pass-diff' : 'fail-diff') : '';
+            html += `<td id="diff_${row.name}_${i}" class="${cls}">${d !== undefined && d !== null ? d : ''}</td>`;
+        }
+        html += `<td id="sec_res_${row.name}">${row.section_result || ''}</td></tr>`;
+
+        html += `</tbody></table></div>`;
+    });
+
+    wrapper.html(html);
+
+    // Bind events
+    wrapper.find('.gsm-input').on('change', function() {
+        const val = $(this).val();
+        const rowName = $(this).data('row');
+        const fieldName = $(this).data('field');
+        
+        // Update frappe model
+        frappe.model.set_value("Quality Checking Section", rowName, fieldName, flt(val));
+    });
+}
+
+function update_dom_calculations(row) {
+    if (!row) return;
+    const quality = row.quality || cur_frm.doc.quality || "";
+    const limit = get_threshold(quality);
+
+    $(`#r1_avg_${row.name}`).text(row.r1_average);
+    $(`#r2_avg_${row.name}`).text(row.r2_average);
+    $(`#grand_avg_${row.name}`).text(row.grand_average_gsm);
+    $(`#res_${row.name}`).text(row.section_result);
+    $(`#sec_res_${row.name}`).text(row.section_result);
+
+    for (let i = 1; i <= 25; i++) {
+        $(`#cmb_avg_${row.name}_${i}`).text(row[`s${i}_combined_avg`]);
+        const d = row[`s${i}_diff`];
+        const td = $(`#diff_${row.name}_${i}`);
+        td.text(d !== undefined && d !== null ? d : '');
+        td.removeClass('pass-diff fail-diff');
+        if (d !== undefined && d !== null) {
+            td.addClass(Math.abs(d) < limit ? 'pass-diff' : 'fail-diff');
+        }
+    }
+}

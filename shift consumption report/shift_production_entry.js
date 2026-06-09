@@ -109,23 +109,42 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                     // allowing user to select company and unit manually before fetching data.
                 }, 600);
             }
-            
-            // Initialize Shift Consumables table with default items
-            if (frm.fields_dict.shift_consumables && (!frm.doc.shift_consumables || frm.doc.shift_consumables.length === 0)) {
-                var default_items = ['CS - 2001001', 'CS - 2001003', 'DC - 3001001'];
-                frm.clear_table('shift_consumables');
-                default_items.forEach(function(item_code) {
-                    var row = frm.add_child('shift_consumables');
-                    row.item_code = item_code;
-                });
-                frm.refresh_field('shift_consumables');
-            }
         }
         var base_target;
         if (frm.doc.docstatus === 0) {
             if (frm.is_new() && !frm.doc.posting_date) {
                 frm.set_value("posting_date", frappe.datetime.get_today());
             }
+
+            // Initialize Shift Consumables table with default items
+            setTimeout(function() {
+                var consumables_fieldname = null;
+                Object.keys(frm.fields_dict).forEach(function(fname) {
+                    var df = frm.fields_dict[fname] ? frm.fields_dict[fname].df : null;
+                    if (df && (df.options === 'Shift Consumables' || fname === 'shift_consumables' || fname === 'shift_consumable')) {
+                        consumables_fieldname = fname;
+                    }
+                });
+
+                console.log("Shift Consumables Field Name found:", consumables_fieldname);
+
+                if (consumables_fieldname && (!frm.doc[consumables_fieldname] || frm.doc[consumables_fieldname].length === 0)) {
+                    var default_items = ['CS - 2001001', 'CS - 2001003', 'DC - 3001001'];
+                    frm.clear_table(consumables_fieldname);
+                    
+                    var promises = [];
+                    default_items.forEach(function(item_code) {
+                        var row = frm.add_child(consumables_fieldname);
+                        // Using Promise to ensure the fetch_from gets executed by the Frappe framework
+                        promises.push(frappe.model.set_value(row.doctype, row.name, 'item_code', item_code));
+                    });
+
+                    Promise.all(promises).then(function() {
+                        frm.refresh_field(consumables_fieldname);
+                    });
+                }
+            }, 800);
+
             calculate_totals(frm);
             update_wastage_options(frm);
 

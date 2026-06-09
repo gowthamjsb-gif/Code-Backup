@@ -95,7 +95,8 @@ def _ensure_parent_fields():
     )
     _ensure_docfield(PARENT_DTYPE, "batch_no", "Batch No", "Data")
     _ensure_docfield(PARENT_DTYPE, "quality", "Quality", "Data")
-    _ensure_docfield(PARENT_DTYPE, "sections", "Sections", "Table", options=CHILD_DTYPE)
+    _ensure_docfield(PARENT_DTYPE, "custom_html_grid", "", "HTML")
+    _ensure_docfield(PARENT_DTYPE, "sections", "Sections", "Table", options=CHILD_DTYPE, depends_on="eval:false")
 
     _ensure_docfield(
         PARENT_DTYPE,
@@ -128,19 +129,19 @@ def _ensure_child_fields():
     _ensure_docfield(CHILD_DTYPE, "grand_average_gsm", "Grand Average GSM", "Float", read_only=1)
 
     _ensure_docfield(CHILD_DTYPE, "row1_section", "Row 1 Samples", "Section Break")
-    for i in range(1, 21):
+    for i in range(1, 26):
         _ensure_docfield(CHILD_DTYPE, f"r1_s{i}", f"R1 Sample {i}", "Float")
 
     _ensure_docfield(CHILD_DTYPE, "row2_section", "Row 2 Samples", "Section Break")
-    for i in range(1, 21):
+    for i in range(1, 26):
         _ensure_docfield(CHILD_DTYPE, f"r2_s{i}", f"R2 Sample {i}", "Float")
 
     _ensure_docfield(CHILD_DTYPE, "combined_section", "Combined Averages", "Section Break")
-    for i in range(1, 21):
+    for i in range(1, 26):
         _ensure_docfield(CHILD_DTYPE, f"s{i}_combined_avg", f"Sample {i} Combined Avg", "Float", read_only=1)
 
     _ensure_docfield(CHILD_DTYPE, "difference_section", "Differences", "Section Break")
-    for i in range(1, 21):
+    for i in range(1, 26):
         _ensure_docfield(CHILD_DTYPE, f"s{i}_diff", f"Sample {i} Diff", "Float", read_only=1)
 
     dt = frappe.get_doc("DocType", CHILD_DTYPE)
@@ -188,7 +189,7 @@ def _ensure_print_format():
         <tr>
           <th>PROPERTIES</th>
           <th>SET GSM</th>
-          {% for i in range(1, 21) %}<th>S{{ i }}</th>{% endfor %}
+          {% for i in range(1, 26) %}<th>S{{ i }}</th>{% endfor %}
           <th>AVERAGE</th>
         </tr>
       </thead>
@@ -196,28 +197,28 @@ def _ensure_print_format():
         <tr>
           <td class="row-header">GSM (ROW 1)</td>
           <td>{{ row.representative_gsm }}</td>
-          {% for i in range(1, 21) %}<td>{{ row["r1_s" ~ i] }}</td>{% endfor %}
+          {% for i in range(1, 26) %}<td>{{ row["r1_s" ~ i] }}</td>{% endfor %}
           <td class="highlight-avg">{{ row.r1_average }}</td>
         </tr>
 
         <tr>
           <td class="row-header">GSM (ROW 2)</td>
           <td>{{ row.representative_gsm }}</td>
-          {% for i in range(1, 21) %}<td>{{ row["r2_s" ~ i] }}</td>{% endfor %}
+          {% for i in range(1, 26) %}<td>{{ row["r2_s" ~ i] }}</td>{% endfor %}
           <td class="highlight-avg">{{ row.r2_average }}</td>
         </tr>
 
         <tr class="highlight-avg">
           <td class="row-header">COMBINED AVG</td>
           <td>-</td>
-          {% for i in range(1, 21) %}<td>{{ row["s" ~ i ~ "_combined_avg"] }}</td>{% endfor %}
+          {% for i in range(1, 26) %}<td>{{ row["s" ~ i ~ "_combined_avg"] }}</td>{% endfor %}
           <td>{{ row.grand_average_gsm }}</td>
         </tr>
 
         <tr>
           <td class="row-header">DIFF</td>
           <td>-</td>
-          {% for i in range(1, 21) %}
+          {% for i in range(1, 26) %}
             {% set d = row["s" ~ i ~ "_diff"] %}
             {% set cls = "pass-diff" if (d is not none and d|string != '' and (d|abs) < limit) else "fail-diff" %}
             <td class="{{ cls }}">{{ d }}</td>
