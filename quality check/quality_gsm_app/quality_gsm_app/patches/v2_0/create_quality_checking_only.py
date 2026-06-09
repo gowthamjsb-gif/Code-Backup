@@ -110,9 +110,7 @@ def _ensure_parent_fields():
     _ensure_docfield(PARENT_DTYPE, "gsm_pass_sections", "Pass Sections", "Int", read_only=1)
     _ensure_docfield(PARENT_DTYPE, "gsm_fail_sections", "Fail Sections", "Int", read_only=1)
 
-    dt = frappe.get_doc("DocType", PARENT_DTYPE)
-    dt.field_order = [f.fieldname for f in dt.fields]
-    dt.save(ignore_permissions=True)
+
 
 
 def _ensure_child_fields():
@@ -144,9 +142,7 @@ def _ensure_child_fields():
     for i in range(1, 26):
         _ensure_docfield(CHILD_DTYPE, f"s{i}_diff", f"Sample {i} Diff", "Float", read_only=1)
 
-    dt = frappe.get_doc("DocType", CHILD_DTYPE)
-    dt.field_order = [f.fieldname for f in dt.fields]
-    dt.save(ignore_permissions=True)
+
 
 
 def _ensure_print_format():

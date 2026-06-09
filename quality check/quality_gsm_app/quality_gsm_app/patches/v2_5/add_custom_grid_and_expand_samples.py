@@ -22,9 +22,7 @@ def execute():
     for i in range(21, 26):
         _ensure_docfield(CHILD_DTYPE, f"s{i}_diff", f"Sample {i} Diff", "Float", read_only=1)
         
-    dt = frappe.get_doc("DocType", CHILD_DTYPE)
-    dt.field_order = [f.fieldname for f in dt.fields]
-    dt.save(ignore_permissions=True)
+
 
     # 2. Add custom_html_grid and hide standard sections table
     _ensure_docfield(PARENT_DTYPE, "custom_html_grid", "", "HTML")
@@ -32,20 +30,6 @@ def execute():
     # Hide standard sections table
     if frappe.db.exists("DocField", {"parent": PARENT_DTYPE, "fieldname": "sections"}):
         frappe.db.set_value("DocField", {"parent": PARENT_DTYPE, "fieldname": "sections"}, "depends_on", "eval:false")
-
-    # Update field order for parent
-    dt_parent = frappe.get_doc("DocType", PARENT_DTYPE)
-    # Ensure custom_html_grid is right above sections
-    if "custom_html_grid" in dt_parent.field_order:
-        dt_parent.field_order.remove("custom_html_grid")
-    
-    if "sections" in dt_parent.field_order:
-        idx = dt_parent.field_order.index("sections")
-        dt_parent.field_order.insert(idx, "custom_html_grid")
-    else:
-        dt_parent.field_order.append("custom_html_grid")
-    
-    dt_parent.save(ignore_permissions=True)
 
     # 3. Update Print Format
     _ensure_print_format()
