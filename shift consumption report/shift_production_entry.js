@@ -109,6 +109,17 @@ frappe.ui.form.on('Shift Wise Production Entry', {
                     // allowing user to select company and unit manually before fetching data.
                 }, 600);
             }
+            
+            // Initialize Shift Consumables table with default items
+            if (frm.fields_dict.shift_consumables && (!frm.doc.shift_consumables || frm.doc.shift_consumables.length === 0)) {
+                var default_items = ['CS - 2001001', 'CS - 2001003', 'DC - 3001001'];
+                frm.clear_table('shift_consumables');
+                default_items.forEach(function(item_code) {
+                    var row = frm.add_child('shift_consumables');
+                    row.item_code = item_code;
+                });
+                frm.refresh_field('shift_consumables');
+            }
         }
         var base_target;
         if (frm.doc.docstatus === 0) {

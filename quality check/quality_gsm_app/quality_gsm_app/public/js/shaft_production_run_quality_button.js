@@ -1,8 +1,9 @@
 frappe.ui.form.on("Shaft Production Run", {
     refresh(frm) {
         // Avoid duplicating button on every refresh.
-        const hasBtn = (frm.custom_buttons || []).some(b => (b.label || "").toLowerCase().includes("start gsm testing"));
-        if (hasBtn) return;
+        if (frm.custom_buttons && frm.custom_buttons[__("Start GSM Testing")]) {
+            return;
+        }
 
         frm.add_custom_button(
             __("Start GSM Testing"),
