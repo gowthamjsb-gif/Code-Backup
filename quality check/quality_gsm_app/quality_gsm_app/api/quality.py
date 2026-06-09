@@ -14,8 +14,16 @@ def get_unique_gsm_values(shaft_production_run: str):
         child_rows = getattr(doc, df.fieldname, None) or []
         for row in child_rows:
             gsm = getattr(row, "gsm", None) if hasattr(row, "gsm") else row.get("gsm")
-            if gsm is not None:
-                values.append(float(gsm))
+            if gsm in (None, "") and hasattr(row, "sticker_gsm"):
+                gsm = getattr(row, "sticker_gsm", None)
+            if gsm in (None, "") and hasattr(row, "target_gsm"):
+                gsm = getattr(row, "target_gsm", None)
+                
+            if gsm is not None and str(gsm).strip() != "":
+                try:
+                    values.append(float(gsm))
+                except Exception:
+                    pass
 
     return sorted(set(v for v in values if v > 0))
 

@@ -94,7 +94,7 @@ def _ensure_parent_fields():
         options="Shaft Production Run",
     )
     _ensure_docfield(PARENT_DTYPE, "batch_no", "Batch No", "Data")
-    _ensure_docfield(PARENT_DTYPE, "quality", "Quality", "Select", options="Higher\nLower")
+    _ensure_docfield(PARENT_DTYPE, "quality", "Quality", "Data")
     _ensure_docfield(PARENT_DTYPE, "sections", "Sections", "Table", options=CHILD_DTYPE)
 
     _ensure_docfield(
@@ -117,7 +117,7 @@ def _ensure_parent_fields():
 def _ensure_child_fields():
     _ensure_docfield(CHILD_DTYPE, "quality_checking_section", "Quality Checking", "Section Break")
     _ensure_docfield(CHILD_DTYPE, "representative_gsm", "Representative GSM", "Float", reqd=1)
-    _ensure_docfield(CHILD_DTYPE, "quality", "Quality", "Select", options="Higher\nLower")
+    _ensure_docfield(CHILD_DTYPE, "quality", "Quality", "Data")
     _ensure_docfield(CHILD_DTYPE, "tolerance_limit", "Tolerance Limit", "Float", read_only=1)
     _ensure_docfield(CHILD_DTYPE, "section_result", "Section Result", "Select", options="PASS\nFAIL", read_only=1)
     _ensure_docfield(CHILD_DTYPE, "pass_count", "Pass Count", "Int", read_only=1)
